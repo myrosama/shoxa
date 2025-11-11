@@ -22,5 +22,14 @@ rad.json
 TestResults.xml
 
 
-node_modules/
-web/node_modules/
+/node_modules
+/web/node_modules
+.DS_Store
+
+/build
+/web/build
+/web/.vite
+/dist
+
+*.log
+.env
