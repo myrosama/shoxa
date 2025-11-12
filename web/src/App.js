@@ -386,7 +386,7 @@ const App = () => {
                 <h2 className={`text-lg font-bold ${Colors.text}`}>{getPageTitle()} ({homeFilteredShops.length})</h2>
                 {showDefaultView && (
                   <button onClick={() => setCurrentView('allShops')} className="text-sm font-medium text-[#C67C43]">
-                    See All >
+                    See All
                   </button>
                 )}
               </div>
