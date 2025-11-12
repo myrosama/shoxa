@@ -24,9 +24,12 @@ const LOCAL_FIREBASE_CONFIG = {
   measurementId: "G-DYXYK6NCYK"
 };
 
+// Use environment variables if they exist, otherwise use local fallback
 const appId = typeof __app_id !== 'undefined' ? __app_id : LOCAL_FIREBASE_CONFIG.appId;
+
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? 
   JSON.parse(__firebase_config) : LOCAL_FIREBASE_CONFIG;
+  
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? 
   __initial_auth_token : null;
 // --------------------------------------------------------
@@ -72,12 +75,12 @@ const ShopCard = ({ shop, onClick }) => {
 
 /**
  * Renders a single category icon.
- * Now handles filter selection.
+ * Now handles filter selection and fits screen.
  */
 const NearbyCategory = ({ title, icon: Icon, onFilterSelect, isSelected }) => (
   <button 
     onClick={onFilterSelect} 
-    className="flex flex-col items-center flex-shrink-0 w-20 group focus:outline-none"
+    className="flex flex-col items-center w-1/5 group focus:outline-none" // Uses 1/5 width to fit 5
   >
     <div className={`p-3 rounded-full shadow-md transition-all duration-300 ease-in-out ${isSelected ? 'bg-white border-2 border-[#C67C43]' : `bg-[${Colors.primary}] group-hover:opacity-80`}`}>
       <Icon className={`w-6 h-6 ${isSelected ? 'text-[#C67C43]' : 'text-white'}`} />
@@ -245,25 +248,29 @@ const App = () => {
       const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
         if (user) {
           setUserId(user.uid);
+          setIsAuthReady(true);
+          console.log(`User signed in: ${user.uid}`);
         } else if (initialAuthToken) {
-          signInWithCustomToken(firebaseAuth, initialAuthToken).catch(err => {
-            console.error("Custom token sign-in failed, falling back to anonymous.", err);
-            signInAnonymously(firebaseAuth);
-          });
+          signInWithCustomToken(firebaseAuth, initialAuthToken)
+            .catch(err => {
+              console.error("Custom token sign-in failed, falling back to anonymous.", err);
+              signInAnonymously(firebaseAuth);
+            });
         } else {
-          signInAnonymously(firebaseAuth).catch(err => {
-            console.error("Anonymous sign-in failed:", err);
-            setError("Authentication failed.");
-          });
+          signInAnonymously(firebaseAuth)
+            .catch(err => {
+              console.error("Anonymous sign-in failed:", err);
+              setError("Authentication failed.");
+            });
         }
         
-        // This listener sets the user ID, so we can set auth ready *after* it runs
-        onAuthStateChanged(firebaseAuth, (finalUser) => {
+        // This second listener ensures auth state is fully resolved before we proceed
+        const authReadyUnsubscribe = onAuthStateChanged(firebaseAuth, (finalUser) => {
             if(finalUser) {
                 setUserId(finalUser.uid);
-                console.log(`User signed in: ${finalUser.uid}`);
+                setIsAuthReady(true);
             }
-            setIsAuthReady(true);
+            authReadyUnsubscribe(); // Remove this listener after it runs once
         });
 
       });
@@ -281,6 +288,7 @@ const App = () => {
     if (!isAuthReady || !userId || !db) return;
 
     setLoading(true);
+    // Correct Firestore path
     const shopsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops');
     
     const unsubscribe = onSnapshot(shopsCollectionRef, (snapshot) => {
@@ -311,7 +319,7 @@ const App = () => {
       );
     }
 
-    // Then, apply search term to the already filtered list
+    // Then, apply search term to the (potentially) filtered list
     if (isSearchActive && searchTerm) {
       const lowerCaseSearch = searchTerm.toLowerCase();
       shops = shops.filter(shop => 
@@ -328,7 +336,7 @@ const App = () => {
 
   const handleSearchFocus = () => {
     setIsSearchActive(true);
-    setFilterCategory(null); // Clear category filter when searching
+    // Don't clear filter, allow searching *within* a filter
   };
 
   const handleSearchCancel = () => {
@@ -337,13 +345,13 @@ const App = () => {
   };
 
   const handleFilterSelect = (category) => {
-    // If clicking the same filter, clear it.
+    // If clicking the same filter, clear it (toggle off).
     if (filterCategory === category) {
       setFilterCategory(null);
     } else {
       setFilterCategory(category);
-      setIsSearchActive(false); // Clear search when filtering
-      setSearchTerm('');
+      // We can keep search active if we want, or clear it.
+      // Let's keep it, so user can filter then search.
     }
   };
   
@@ -357,9 +365,12 @@ const App = () => {
   
   const getPageTitle = () => {
     if (isSearchActive) return "Search Results";
-    if (filterCategory) return `${filterCategory}s`;
+    if (filterCategory) return `${filterCategory}s`; // e.g., "Restaurants"
     return "Recommended Shops";
   };
+
+  // Determine if the default view (Map + Promotions) should be shown
+  const showDefaultView = !isSearchActive && !filterCategory;
   
   // --- Loading / Error State ---
   if (error) {
@@ -378,7 +389,8 @@ const App = () => {
         
         {/* --- Header Area (Stays at Top) --- */}
         <header className="bg-white border-b border-gray-100 z-10 sticky top-0">
-          <div className="h-10 flex justify-between items-center px-4 pt-2">
+          {/* Header/Status Bar Simulation (Added padding) */}
+          <div className="h-10 flex justify-between items-center px-4 pt-4">
               <span className="font-bold text-lg" style={{ color: Colors.primary }}>SHOXA</span>
               <div className="flex space-x-2 items-center">
                   <Bell className="w-5 h-5 text-gray-500" />
@@ -394,7 +406,7 @@ const App = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search Shops, Products..."
+                placeholder={filterCategory ? `Search in ${filterCategory}s...` : "Search Shops, Products..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onFocus={handleSearchFocus}
@@ -420,7 +432,7 @@ const App = () => {
           
           {/* 2. Map Banner (Fades out in search/filter mode) */}
           <div 
-            className={`px-4 transition-all duration-300 ease-in-out ${isSearchActive || filterCategory ? 'opacity-0 h-0' : 'opacity-100 h-52 mb-6'}`}
+            className={`px-4 transition-all duration-300 ease-in-out ${showDefaultView ? 'opacity-100 h-52 mb-6' : 'opacity-0 h-0 invisible'}`}
           >
             <div 
               style={{ backgroundColor: Colors.secondary }}
@@ -445,25 +457,15 @@ const App = () => {
             </div>
           </div>
           
-          {/* 3. Nearby Categories (Animates to top in filter mode) */}
+          {/* 3. Nearby Categories (Fixed bug - no scrollbar) */}
           <div 
-            className={`transition-all duration-300 ease-in-out ${isSearchActive ? 'opacity-0 h-0' : 'opacity-100'} ${filterCategory ? 'py-3 border-b border-gray-200' : 'px-4 mb-6'}`}
+            className={`px-4 mb-6 transition-all duration-300 ease-in-out ${isSearchActive ? 'opacity-0 h-0 invisible' : 'opacity-100'}`}
           >
-            <div className="flex justify-between items-center mb-3 px-4">
-              <h2 className={`text-lg font-bold ${Colors.text} transition-all duration-300 ${filterCategory ? 'opacity-0 w-0' : 'opacity-100'}`}>
-                Quick Access
-              </h2>
-              {/* Show "Clear Filter" button only in filter mode */}
-              {filterCategory && (
-                <button 
-                  onClick={() => setFilterCategory(null)}
-                  className="text-sm font-medium text-[#C67C43] flex items-center"
-                >
-                  <X className="w-4 h-4 mr-1" /> Clear Filter
-                </button>
-              )}
-            </div>
-            <div className="flex space-x-4 overflow-x-auto pb-2 px-4">
+            <h2 className={`text-lg font-bold mb-3 ${Colors.text}`}>
+              Quick Access
+            </h2>
+            {/* Using flex and justify-around to fit all 5 icons */}
+            <div className="flex justify-around pb-2">
               <NearbyCategory title="Shops" icon={ShoppingCart} isSelected={filterCategory === 'Shop'} onFilterSelect={() => handleFilterSelect('Shop')} />
               <NearbyCategory title="Restaurants" icon={Compass} isSelected={filterCategory === 'Restaurant'} onFilterSelect={() => handleFilterSelect('Restaurant')} />
               <NearbyCategory title="Hospitals" icon={User} isSelected={filterCategory === 'Hospital'} onFilterSelect={() => handleFilterSelect('Hospital')} />
@@ -492,8 +494,10 @@ const App = () => {
             )}
           </div>
           
-          {/* 5. Featured Products Section (NEW) */}
-          <div className="px-4 mb-6">
+          {/* 5. Featured Products Section (Hides on search/filter) */}
+          <div 
+            className={`px-4 mb-6 transition-all duration-300 ease-in-out ${showDefaultView ? 'opacity-100' : 'opacity-0 h-0 invisible'}`}
+          >
              <h2 className={`text-lg font-bold mb-3 ${Colors.text}`}>Promotions & Products</h2>
              <div className="flex space-x-4 overflow-x-auto pb-2">
               {mockFeaturedProducts.map(product => (
