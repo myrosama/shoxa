@@ -1,0 +1,7 @@
+// Change this line:
+import App from './admin/AdminPanel.js';
+
+// ...back to this:
+import App from './App.js';
+
+You are now fully equipped! Good luck testing the Admin Panel!

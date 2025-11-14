@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './admin/AdminPanel.js';
+import App from './App.js';
 
 // Get the root element from index.html
 const container = document.getElementById('root');
