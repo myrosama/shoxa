@@ -781,17 +781,18 @@ const App = () => {
   // --- Main Render ---
   return (
     <div style={{ backgroundColor: Colors.background }} className={`min-h-screen font-sans flex flex-col items-center`}>
-      <Notification message={notification} onClear={() => setNotification('')} />
-      {showAuthModal && <AuthModal auth={auth} onClose={() => setShowAuthModal(false)} setNotification={setNotification} />}
+      {/* ... existing code ... */}
 
-      <div className="w-full max-w-md h-full min-h-screen shadow-2xl bg-white flex flex-col relative overflow-hidden">
+      {/* MODIFICATION: Changed h-full min-h-screen to h-screen to force exact viewport height */}
+      <div className="w-full max-w-md h-screen shadow-2xl bg-white flex flex-col relative overflow-hidden">
         
         {/* Page Content: Conditionally render pages */}
-        {/* RE-ADDED from V1.2: All Shops view logic */}
-        <div className={`flex-grow flex flex-col transition-transform duration-300 ease-in-out ${currentView === 'home' ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* MODIFICATION: Added overflow-y-auto here to make THIS the main scroller, not the children */}
+        <div className={`flex-grow overflow-y-auto ${currentView === 'home' ? '' : 'hidden'}`}>
           
           {/* --- Home Tab --- */}
-          <div className={`flex-grow flex flex-col ${activeTab === 'Home' ? '' : 'hidden'}`}>
+          {/* MODIFICATION: Removed flex-grow and flex-col, as parent now scrolls */}
+          <div className={`${activeTab === 'Home' ? '' : 'hidden'}`}>
             <header className="bg-white border-b border-gray-100 z-10 sticky top-0">
               <div className="h-10 flex justify-between items-center px-4 pt-4">
                   <span className="font-bold text-lg" style={{ color: Colors.primary }}>SHOXA</span>
@@ -817,7 +818,8 @@ const App = () => {
                 </div>
               </div>
             </header>
-            <main className="flex-grow overflow-y-auto pb-24">
+            {/* MODIFICATION: Removed flex-grow and overflow-y-auto, ADDED pb-24 for footer padding */}
+            <main className="pb-24">
               {/* RE-ADDED from V1.2: Map Banner */}
               <div className={`px-4 transition-all duration-300 ease-in-out ${showDefaultView ? 'opacity-100 h-52 mb-6' : 'opacity-0 h-0 invisible'}`}>
                 <div style={{ backgroundColor: Colors.secondary }} className={`h-48 rounded-xl overflow-hidden shadow-lg flex items-center justify-center relative`}>
@@ -837,6 +839,7 @@ const App = () => {
                 </div>
               </div>
               
+              {/* MODIFICATION: Added pb-24 for footer padding */}
               <div className={`px-4 mb-6 transition-all duration-300 ease-in-out ${isSearchActive ? 'opacity-0 h-0 invisible' : 'opacity-100'}`}>
                 <h2 className={`text-lg font-bold mb-3 ${Colors.text}`}>Quick Access</h2>
                 <div className="flex justify-around pb-2">
@@ -887,7 +890,8 @@ const App = () => {
           </div>
           
           {/* --- NEW: Feed Tab --- */}
-          <div className={`flex-grow flex flex-col ${activeTab === 'Feed' ? '' : 'hidden'}`}>
+          {/* MODIFICATION: Removed flex-grow, added h-full */}
+          <div className={`flex flex-col h-full ${activeTab === 'Feed' ? '' : 'hidden'}`}>
              <header className="bg-white border-b border-gray-100 z-10 sticky top-0 p-4">
                 <h2 className="text-xl font-bold text-center" style={{ color: Colors.primary }}>Your Feed</h2>
              </header>
@@ -895,7 +899,8 @@ const App = () => {
           </div>
 
           {/* --- Map Tab --- */}
-          <div className={`flex-grow ${activeTab === 'Map' ? '' : 'hidden'}`}>
+          {/* MODIFICATION: Removed flex-grow, added h-full */}
+          <div className={`h-full ${activeTab === 'Map' ? '' : 'hidden'}`}>
             <MapView 
               shops={allShops} 
               userLocation={userLocation}
@@ -907,12 +912,14 @@ const App = () => {
           </div>
 
           {/* --- Delivery Tab (Placeholder) --- */}
-          <div className={`flex-grow flex items-center justify-center ${activeTab === 'Delivery' ? '' : 'hidden'}`}>
+          {/* MODIFICATION: Removed flex-grow, added h-full */}
+          <div className={`h-full flex items-center justify-center ${activeTab === 'Delivery' ? '' : 'hidden'}`}>
             <p className="text-gray-500">Delivery features coming soon!</p>
           </div>
           
           {/* --- Profile Tab --- */}
-          <div className={`flex-grow flex flex-col p-4 ${activeTab === 'Profile' ? '' : 'hidden'}`}>
+          {/* MODIFICATION: Removed flex-grow, added h-full and pb-24 for footer padding */}
+          <div className={`flex flex-col p-4 h-full pb-24 ${activeTab === 'Profile' ? '' : 'hidden'}`}>
             {authUser && !authUser.isAnonymous ? (
               <div>
                 <h2 className="text-2xl font-bold">Welcome!</h2>
@@ -941,6 +948,7 @@ const App = () => {
         </div>
 
         {/* --- RE-ADDED from V1.2: "All Shops" Page --- */}
+        {/* This page is absolute, so its layout is separate. Needs pb-24 on its main scroller. */}
         <div className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${currentView === 'allShops' ? 'translate-x-0' : 'translate-x-full'} z-30`}>
           <header className="bg-white border-b border-gray-100 z-10 sticky top-0">
             <div className="h-10 flex justify-between items-center px-4 pt-4">
@@ -963,6 +971,7 @@ const App = () => {
               </div>
             </div>
           </header>
+          {/* MODIFICATION: Added pb-24 for footer padding */}
           <main className="flex-grow overflow-y-auto pb-24 px-4">
             <h2 className="text-lg font-bold mb-3 text-gray-800">Results ({allShopsFiltered.length})</h2>
             {allShopsFiltered.length > 0 ? (
@@ -981,7 +990,8 @@ const App = () => {
         </div>
 
         {/* --- Shared Components --- */}
-        <footer className="sticky bottom-0 w-full max-w-md mx-auto bg-white border-t border-gray-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10">
+        {/* MODIFICATION: Removed 'sticky' and 'bottom-0'. It's now a natural block at the end of the flex container. */}
+        <footer className="w-full max-w-md mx-auto bg-white border-t border-gray-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10">
           <div className="flex justify-around py-3">
             <NavItem icon={Home} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
             <NavItem icon={Rss} label="Feed" active={activeTab === 'Feed'} onClick={() => setActiveTab('Feed')} />
