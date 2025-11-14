@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { 
   Search, Compass, ShoppingCart, Bell, User, Home, Map as MapIcon, 
   X, ChevronDown, Clock, MapPin, Tag, Building, ArrowLeft, Star, Heart, Share2, Phone,
-  Rss, MessageCircle, Loader2 // <-- THE FIX IS HERE
+  Rss, MessageCircle, Loader2
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 
@@ -18,7 +18,6 @@ import {
 } from 'firebase/firestore';
 
 // --- Local & Global Configuration ---
-// NEW: We now read from the .env file
 const LOCAL_FIREBASE_CONFIG = {
   apiKey: process.env.REACT_APP_API_KEY,
   authDomain: process.env.REACT_APP_AUTH_DOMAIN,
@@ -28,14 +27,11 @@ const LOCAL_FIREBASE_CONFIG = {
   appId: process.env.REACT_APP_APP_ID,
   measurementId: process.env.REACT_APP_MEASUREMENT_ID
 };
-// NEW: Read the Maps API key from .env
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
-// This logic stays the same, but now it's cleaner!
 const appId = typeof __app_id !== 'undefined' ? __app_id : LOCAL_FIREBASE_CONFIG.appId;
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? 
   JSON.parse(__firebase_config) : LOCAL_FIREBASE_CONFIG;
-  
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? 
   __initial_auth_token : null;
 // --------------------------------------------------------
@@ -65,7 +61,8 @@ function getDistance(lat1, lon1, lat2, lon2) {
 
 // --- Time Ago Function ---
 function timeAgo(date) {
-  const seconds = Math.floor((new Date() - date) / 1000);
+  if (!date) return '...';
+  const seconds = Math.floor((new Date() - date.toDate()) / 1000);
   let interval = seconds / 31536000;
   if (interval > 1) return Math.floor(interval) + "y ago";
   interval = seconds / 2592000;
@@ -89,7 +86,7 @@ const ShopCard = ({ shop, onClick, userLocation }) => {
   const [distance, setDistance] = useState(null);
 
   useEffect(() => {
-    if (userLocation && shop.location) {
+    if (userLocation && shop.location && shop.location.lat && shop.location.lng) {
       const dist = getDistance(
         userLocation.lat,
         userLocation.lng,
@@ -143,6 +140,18 @@ const NavItem = ({ icon: Icon, label, active, onClick }) => (
     <Icon className={`w-6 h-6 transition duration-150 ${active ? 'text-[#C67C43]' : 'text-gray-500 group-hover:text-[#C67C43]'}`} />
     <span className={`mt-1 font-medium ${active ? 'text-[#C67C43]' : 'text-gray-500'}`}>{label}</span>
   </button>
+);
+
+// RE-ADDED from V1.2
+const ProductCarouselCard = ({ product }) => (
+  <div className="flex-shrink-0 w-36 rounded-lg shadow-md overflow-hidden bg-white border border-gray-100 mx-2">
+    <img src={product.image} alt={product.name} className="w-full h-24 object-cover" />
+    <div className="p-2">
+      <h4 className="text-sm font-semibold truncate">{product.name}</h4>
+      <p className="text-xs text-gray-500 truncate">{product.shopName}</p>
+      <p className="text-sm font-bold mt-1 text-gray-800">{product.price} UZS</p>
+    </div>
+  </div>
 );
 
 const ProductCard = ({ product, onClick }) => (
@@ -271,7 +280,7 @@ const ShopDetailPage = ({ shop, onClose, db, appId, userLocation, onFollow, isFo
   
   const [distance, setDistance] = useState(null);
   useEffect(() => {
-    if (userLocation && shop.location) {
+    if (userLocation && shop.location && shop.location.lat && shop.location.lng) {
       const dist = getDistance(
         userLocation.lat,
         userLocation.lng,
@@ -388,7 +397,7 @@ const FeedPost = ({ post, shop }) => {
         />
         <div className="ml-3">
           <p className="font-semibold text-sm">{shop.name_uz}</p>
-          <p className="text-xs text-gray-500">{timeAgo(post.createdAt.toDate())}</p>
+          <p className="text-xs text-gray-500">{timeAgo(post.createdAt)}</p>
         </div>
       </div>
       
@@ -591,6 +600,19 @@ const App = () => {
   // Location State
   const [userLocation, setUserLocation] = useState(null); // { lat, lng }
 
+  // RE-ADDED from V1.2: Page View State
+  const [currentView, setCurrentView] = useState('home'); // 'home' or 'allShops'
+  const [allShopsSearchTerm, setAllShopsSearchTerm] = useState('');
+
+  // RE-ADDED from V1.2: Mock Products
+  const mockFeaturedProducts = [
+    { id: 'p1', name: 'Kuk Somsa (Spring)', shopName: 'Tandir Somsa', price: '7,000', image: 'https://placehold.co/150x100/964B00/ffffff?text=Somsa' },
+    { id: 'p2', name: 'To\'y Oshi (Plov)', shopName: 'Osh Center', price: '28,000', image: 'https://placehold.co/150x100/A0522D/ffffff?text=Plov' },
+    { id: 'p3', name: 'Freshly Baked Non', shopName: 'Tandir Bakery', price: '4,000', image: 'https://placehold.co/150x100/D2B48C/000?text=Bread' },
+    { id: 'p4', name: 'Qozon Kabob', shopName: 'Milliy Taomlar', price: '45,000', image: 'https://placehold.co/150x100/8B4513/ffffff?text=Kabob' },
+    { id: 'p5', name: 'Mastava', shopName: 'Oshxona', price: '22,000', image: 'https://placehold.co/150x100/A0522D/ffffff?text=Soup' },
+  ];
+
   // 1. Initialize Firebase and Authenticate
   useEffect(() => {
     try {
@@ -607,13 +629,11 @@ const App = () => {
 
       const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
         if (user) {
-          // User is signed in (either logged-in or anonymous)
           setAuthUser(user);
           setCurrentUserId(user.uid);
           setIsAuthReady(true);
           console.log(`User signed in: ${user.uid} (Anon: ${user.isAnonymous})`);
         } else {
-          // No user, sign in anonymously for browsing
           signInAnonymously(firebaseAuth).catch(err => console.error("Anon sign-in failed:", err));
         }
       });
@@ -663,12 +683,10 @@ const App = () => {
     });
 
     // Fetch User's Following List
-    // This is a private path: .../users/{userId}/following
     const followingCollectionRef = collection(db, 'artifacts', appId, 'users', currentUserId, 'following');
     const followingUnsub = onSnapshot(followingCollectionRef, (snapshot) => {
       const shopIdList = snapshot.docs.map(doc => doc.id);
       setFollowingList(shopIdList);
-      console.log("Updated following list:", shopIdList);
     }, (error) => {
       console.error("Firestore onSnapshot error (Following):", error);
       setError("Failed to load user data. Check Firebase Rules.");
@@ -678,23 +696,44 @@ const App = () => {
       shopsUnsub();
       followingUnsub();
     };
-  }, [isAuthReady, db, currentUserId, appId]); // Rerun when user logs in/out
+  }, [isAuthReady, db, currentUserId, appId]);
 
   // 4. Memoized Filtering Logic
-  const filteredShops = useMemo(() => {
+  const homeFilteredShops = useMemo(() => {
     let shops = allShops;
     if (filterCategory) {
       shops = shops.filter(shop => shop.type && shop.type.toLowerCase() === filterCategory.toLowerCase());
     }
+    // MERGED: Search also checks 'type'
     if (isSearchActive && searchTerm) {
       const lowerCaseSearch = searchTerm.toLowerCase();
       shops = shops.filter(shop => 
         (shop.name_uz && shop.name_uz.toLowerCase().includes(lowerCaseSearch)) ||
-        (shop.name_en && shop.name_en.toLowerCase().includes(lowerCaseSearch))
+        (shop.name_en && shop.name_en.toLowerCase().includes(lowerCaseSearch)) ||
+        (shop.type && shop.type.toLowerCase().includes(lowerCaseSearch)) // <-- ADDED
       );
     }
     return shops;
   }, [allShops, filterCategory, searchTerm, isSearchActive]);
+
+  // RE-ADDED from V1.2: Filtering for the "All Shops" page
+  const allShopsFiltered = useMemo(() => {
+    let shops = allShops;
+    if (!allShopsSearchTerm) return shops;
+    const lowerCaseSearch = allShopsSearchTerm.toLowerCase();
+    // MERGED: Search also checks 'type'
+    return shops.filter(shop => 
+      (shop.name_uz && shop.name_uz.toLowerCase().includes(lowerCaseSearch)) ||
+      (shop.name_en && shop.name_en.toLowerCase().includes(lowerCaseSearch)) ||
+      (shop.type && shop.type.toLowerCase().includes(lowerCaseSearch))
+    );
+  }, [allShops, allShopsSearchTerm]);
+
+  // RE-ADDED from V1.2: Only show 4 recommended shops
+  const recommendedShops = useMemo(() => {
+    return homeFilteredShops.slice(0, 4);
+  }, [homeFilteredShops]);
+
 
   // --- Event Handlers ---
   const handleSearchFocus = () => setIsSearchActive(true);
@@ -706,37 +745,26 @@ const App = () => {
     setFilterCategory(prev => prev === category ? null : category);
   };
   
-  // NEW: Follow/Unfollow Logic
   const handleFollow = async (shopId) => {
     if (!currentUserId || !db) return;
-    
     const followRef = doc(db, 'artifacts', appId, 'users', currentUserId, 'following', shopId);
-    
     if (followingList.includes(shopId)) {
-      // Unfollow
       try {
         await deleteDoc(followRef);
         setNotification("Unfollowed shop.");
-      } catch (e) {
-        console.error("Error unfollowing:", e);
-        setNotification("Error unfollowing shop.");
-      }
+      } catch (e) { setNotification("Error unfollowing shop."); }
     } else {
-      // Follow
       try {
         await setDoc(followRef, { followedAt: new Date() });
         setNotification("Followed shop!");
-      } catch (e) {
-        console.error("Error following:", e);
-        setNotification("Error following shop.");
-      }
+      } catch (e) { setNotification("Error following shop."); }
     }
   };
 
   const getPageTitle = () => {
     if (isSearchActive) return "Search Results";
     if (filterCategory) return `${filterCategory}s`;
-    return "Recommended Shops";
+    return "Recommended"; // RE-ADDED from V1.2
   };
 
   const showDefaultView = !isSearchActive && !filterCategory;
@@ -759,7 +787,8 @@ const App = () => {
       <div className="w-full max-w-md h-full min-h-screen shadow-2xl bg-white flex flex-col relative overflow-hidden">
         
         {/* Page Content: Conditionally render pages */}
-        <div className="flex-grow flex flex-col">
+        {/* RE-ADDED from V1.2: All Shops view logic */}
+        <div className={`flex-grow flex flex-col transition-transform duration-300 ease-in-out ${currentView === 'home' ? 'translate-x-0' : '-translate-x-full'}`}>
           
           {/* --- Home Tab --- */}
           <div className={`flex-grow flex flex-col ${activeTab === 'Home' ? '' : 'hidden'}`}>
@@ -768,9 +797,7 @@ const App = () => {
                   <span className="font-bold text-lg" style={{ color: Colors.primary }}>SHOXA</span>
                   <div className="flex space-x-2 items-center">
                       <Bell className="w-5 h-5 text-gray-500" />
-                      <span className="text-xs text-gray-400">
-                        Tashkent
-                      </span>
+                      <span className="text-xs text-gray-400">Tashkent</span>
                   </div>
               </div>
               <div className="p-4 pt-2">
@@ -778,7 +805,7 @@ const App = () => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
-                    placeholder={filterCategory ? `Search in ${filterCategory}s...` : "Search Shops, Products..."}
+                    placeholder={filterCategory ? `Search in ${filterCategory}s...` : "Search Shops, Products, Type..."}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onFocus={handleSearchFocus}
@@ -791,9 +818,25 @@ const App = () => {
               </div>
             </header>
             <main className="flex-grow overflow-y-auto pb-24">
+              {/* RE-ADDED from V1.2: Map Banner */}
               <div className={`px-4 transition-all duration-300 ease-in-out ${showDefaultView ? 'opacity-100 h-52 mb-6' : 'opacity-0 h-0 invisible'}`}>
-                {/* ... Map Banner ... */}
+                <div style={{ backgroundColor: Colors.secondary }} className={`h-48 rounded-xl overflow-hidden shadow-lg flex items-center justify-center relative`}>
+                  <img src="https://placehold.co/400x192/964B00/D2B48C?text=Nearby+Locations+Map" alt="Map Banner" className="w-full h-full object-cover opacity-60"/>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-white">
+                    <h2 className="text-2xl font-black mb-1">Find Your Branch Now!</h2>
+                    <p className="text-sm font-light mb-4 text-center">See all {allShops.length} sites near you.</p>
+                    {/* MERGED: Button now switches to Map tab */}
+                    <button 
+                      style={{ backgroundColor: Colors.primary }} 
+                      className={`text-white px-5 py-2 rounded-full font-semibold shadow-md hover:opacity-90 transition`} 
+                      onClick={() => setActiveTab('Map')}
+                    >
+                      Open Full Map
+                    </button>
+                  </div>
+                </div>
               </div>
+              
               <div className={`px-4 mb-6 transition-all duration-300 ease-in-out ${isSearchActive ? 'opacity-0 h-0 invisible' : 'opacity-100'}`}>
                 <h2 className={`text-lg font-bold mb-3 ${Colors.text}`}>Quick Access</h2>
                 <div className="flex justify-around pb-2">
@@ -804,19 +847,41 @@ const App = () => {
                   <NearbyCategory title="Services" icon={Bell} isSelected={filterCategory === 'Service'} onFilterSelect={() => handleFilterSelect('Service')} />
                 </div>
               </div>
+
+              {/* RE-ADDED from V1.2: "See All >" button and 4-shop limit */}
               <div className="px-4 mb-6">
-                <h2 className={`text-lg font-bold mb-3 ${Colors.text}`}>{getPageTitle()} ({filteredShops.length})</h2>
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className={`text-lg font-bold ${Colors.text}`}>{getPageTitle()} ({homeFilteredShops.length})</h2>
+                  {showDefaultView && (
+                    <button onClick={() => setCurrentView('allShops')} className="text-sm font-medium text-[#C67C43]">
+                      See All 
+                    </button>
+                  )}
+                </div>
                 {loading ? (
                   <p className="text-gray-500">Fetching shop data...</p>
-                ) : filteredShops.length > 0 ? (
+                ) : homeFilteredShops.length > 0 ? (
                   <div className="grid grid-cols-2 gap-4">
-                    {filteredShops.map((shop) => (
+                    {/* Only show 4 shops on the home page */}
+                    {recommendedShops.map((shop) => (
                       <ShopCard key={shop.id} shop={shop} onClick={() => setSelectedShop(shop)} userLocation={userLocation} />
                     ))}
                   </div>
                 ) : (
                   <p className="text-gray-500 text-center py-8">No sites found.</p>
                 )}
+              </div>
+
+              {/* RE-ADDED from V1.2: Infinite Product Carousel */}
+              <div className={`mb-6 transition-all duration-300 ease-in-out ${showDefaultView ? 'opacity-100' : 'opacity-0 h-0 invisible'}`}>
+                <h2 className={`text-lg font-bold mb-3 px-4 ${Colors.text}`}>Promotions & Products</h2>
+                <div className="relative w-full overflow-hidden h-44 group">
+                  <div className="absolute top-0 left-0 flex animate-infinite-scroll group-hover:pause">
+                    {[...mockFeaturedProducts, ...mockFeaturedProducts].map((product, index) => (
+                      <ProductCarouselCard key={`${product.id}-${index}`} product={product} />
+                    ))}
+                  </div>
+                </div>
               </div>
             </main>
           </div>
@@ -875,19 +940,57 @@ const App = () => {
           </div>
         </div>
 
-        {/* --- Sticky Bottom Navigation Bar (5 TABS) --- */}
+        {/* --- RE-ADDED from V1.2: "All Shops" Page --- */}
+        <div className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${currentView === 'allShops' ? 'translate-x-0' : 'translate-x-full'} z-30`}>
+          <header className="bg-white border-b border-gray-100 z-10 sticky top-0">
+            <div className="h-10 flex justify-between items-center px-4 pt-4">
+                <button onClick={() => setCurrentView('home')} className="flex items-center text-[#C67C43]">
+                  <ArrowLeft className="w-5 h-5 mr-1" /> Back
+                </button>
+                <span className="font-bold text-lg text-gray-800">All Shops</span>
+                <div className="w-16"></div> {/* Spacer */}
+            </div>
+            <div className="p-4 pt-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search all shops and hospitals..."
+                  value={allShopsSearchTerm}
+                  onChange={(e) => setAllShopsSearchTerm(e.target.value)}
+                  className={`w-full py-3 pl-10 pr-4 rounded-full border-2 border-gray-200 focus:outline-none focus:border-[#C67C43] transition-all duration-300 ${Colors.background} text-gray-800`}
+                />
+              </div>
+            </div>
+          </header>
+          <main className="flex-grow overflow-y-auto pb-24 px-4">
+            <h2 className="text-lg font-bold mb-3 text-gray-800">Results ({allShopsFiltered.length})</h2>
+            {allShopsFiltered.length > 0 ? (
+              <div className="grid grid-cols-2 gap-4">
+                {allShopsFiltered.map((shop) => (
+                  <ShopCard key={shop.id} shop={shop} onClick={() => {
+                    setSelectedShop(shop);
+                    setCurrentView('home'); // Go back to home to open detail
+                  }} userLocation={userLocation} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-8">No shops found.</p>
+            )}
+          </main>
+        </div>
+
+        {/* --- Shared Components --- */}
         <footer className="sticky bottom-0 w-full max-w-md mx-auto bg-white border-t border-gray-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10">
           <div className="flex justify-around py-3">
             <NavItem icon={Home} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
             <NavItem icon={Rss} label="Feed" active={activeTab === 'Feed'} onClick={() => setActiveTab('Feed')} />
             <NavItem icon={MapIcon} label="Map" active={activeTab === 'Map'} onClick={() => setActiveTab('Map')} />
             <NavItem icon={ShoppingCart} label="Delivery" active={activeTab === 'Delivery'} onClick={() => setActiveTab('Delivery')} />
-            {/* THIS IS THE FIX: */}
             <NavItem icon={User} label="Profile" active={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
           </div>
         </footer>
 
-        {/* --- Shop Detail Page (Renders on top) --- */}
         {selectedShop && (
           <ShopDetailPage 
             shop={selectedShop} 
@@ -902,8 +1005,21 @@ const App = () => {
 
       </div> {/* End Mobile Frame */}
       
-      {/* Animation CSS */}
+      {/* RE-ADDED from V1.2: CSS for Infinite Carousel */}
       <style>{`
+        @keyframes scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-infinite-scroll {
+          /* Each card is 144px (w-36) + 16px (mx-2*2) = 160px. 5 cards = 800px. */
+          /* We have 2 sets, so 1600px total width */
+          width: 1600px; 
+          animation: scroll 30s linear infinite;
+        }
+        .group-hover\\:pause:hover {
+          animation-play-state: paused;
+        }
         @keyframes slideIn {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
