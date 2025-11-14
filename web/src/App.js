@@ -36,7 +36,7 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ?
   
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? 
   __initial_auth_token : null;
-  // --------------------------------------------------------
+// --------------------------------------------------------
 
 // Autumn Vibe Color Palette
 const Colors = {
@@ -49,6 +49,7 @@ const Colors = {
 
 // --- Haversine Distance (for "meters away") ---
 function getDistance(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
   const R = 6371; // Radius of the earth in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -127,7 +128,7 @@ const NavItem = ({ icon: Icon, label, active, onClick }) => (
 );
 
 const ProductCard = ({ product, onClick }) => (
-  <button onClick={onClick} className="text-left">
+  <button onClick={onClick} className="text-left w-full">
     <div className="rounded-lg shadow-md overflow-hidden bg-white border border-gray-100">
       <img src={product.imageUrl || 'https://placehold.co/150x100/D2B48C/000?text=Product'} alt={product.name} className="w-full h-24 object-cover" />
       <div className="p-2">
@@ -150,7 +151,7 @@ const ProductCard = ({ product, onClick }) => (
 const MapView = ({ shops, userLocation, onShopClick }) => {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY || "" // Fallback for safety
   });
 
   const mapContainerStyle = {
@@ -182,7 +183,7 @@ const MapView = ({ shops, userLocation, onShopClick }) => {
     };
   };
 
-  if (loadError) return <div>Error loading maps. Please check API key.</div>;
+  if (loadError) return <div>Error loading maps. Make sure your Google Maps API Key is correct in .env and you've installed @react-google-maps/api.</div>;
   if (!isLoaded) return <div>Loading Map...</div>;
 
   return (
@@ -190,6 +191,7 @@ const MapView = ({ shops, userLocation, onShopClick }) => {
       mapContainerStyle={mapContainerStyle}
       center={center}
       zoom={13}
+      options={{ disableDefaultUI: true, zoomControl: true }}
     >
       {userLocation && (
         <Marker 
@@ -198,10 +200,10 @@ const MapView = ({ shops, userLocation, onShopClick }) => {
         />
       )}
       {shops.map(shop => (
-        shop.location && (
+        shop.location && shop.location.lat && shop.location.lng && (
           <Marker
             key={shop.id}
-            position={shop.location}
+            position={shop.location} // Assumes {lat: ..., lng: ...}
             title={shop.name_uz}
             icon={getIcon(shop.type)}
             onClick={() => setSelectedShop(shop)}
@@ -213,12 +215,12 @@ const MapView = ({ shops, userLocation, onShopClick }) => {
           position={selectedShop.location}
           onCloseClick={() => setSelectedShop(null)}
         >
-          <div className="text-gray-800">
+          <div className="text-gray-800 p-1">
             <h4 className="font-bold">{selectedShop.name_uz}</h4>
-            <p>{selectedShop.type}</p>
+            <p className="text-sm">{selectedShop.type}</p>
             <button 
               onClick={() => onShopClick(selectedShop)}
-              className="text-blue-600 hover:underline text-sm"
+              className="text-blue-600 hover:underline text-sm font-medium"
             >
               View Details
             </button>
@@ -238,6 +240,7 @@ const ShopDetailPage = ({ shop, onClose, db, appId, userLocation }) => {
   useEffect(() => {
     if (!shop || !db) return;
     setLoadingInventory(true);
+    // Path: /artifacts/{appId}/public/data/shops/{shopId}/inventory
     const inventoryRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops', shop.id, 'inventory');
     
     const unsubscribe = onSnapshot(inventoryRef, (snapshot) => {
@@ -267,7 +270,7 @@ const ShopDetailPage = ({ shop, onClose, db, appId, userLocation }) => {
   }, [userLocation, shop.location]);
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-white z-20">
+    <div className="absolute inset-0 flex flex-col bg-white z-20 animate-slideIn">
       {/* Header */}
       <header className="sticky top-0 bg-white z-10">
         <div className="h-16 flex justify-between items-center px-4 pt-2">
@@ -295,7 +298,7 @@ const ShopDetailPage = ({ shop, onClose, db, appId, userLocation }) => {
             <img 
               src={shop.profilePicUrl || 'https://placehold.co/100x100/D2B48C/000?text=Shop'}
               alt="Shop Profile"
-              className="w-24 h-24 rounded-full border-4 border-white shadow-lg"
+              className="w-24 h-24 rounded-full border-4 border-white shadow-lg object-cover"
             />
             <div className="pb-2">
               <h1 className="text-2xl font-bold text-gray-800">{shop.name_uz}</h1>
@@ -323,7 +326,7 @@ const ShopDetailPage = ({ shop, onClose, db, appId, userLocation }) => {
         {/* About Section */}
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-bold text-gray-800 mb-2">About</h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 whitespace-pre-wrap">
             {shop.about || 'This shop has not provided a description yet.'}
           </p>
         </div>
@@ -457,7 +460,9 @@ const App = () => {
   // 1. Initialize Firebase and Authenticate
   useEffect(() => {
     try {
-      if (!firebaseConfig.apiKey) throw new Error("Firebase config is empty");
+      if (!firebaseConfig || !firebaseConfig.apiKey) {
+        throw new Error("Firebase config is missing or incomplete. Check your .env file.");
+      }
       
       const app = initializeApp(firebaseConfig);
       const firestore = getFirestore(app);
@@ -479,7 +484,7 @@ const App = () => {
       return () => unsubscribe();
     } catch (e) {
       console.error("Firebase Initialization Error:", e);
-      setError("Failed to initialize the app.");
+      setError("Failed to initialize the app. Check your .env file and Firebase setup.");
     }
   }, []);
 
@@ -495,13 +500,12 @@ const App = () => {
         },
         (error) => {
           console.error("Error getting geolocation:", error);
-          // Default to Tashkent if user denies
-          setUserLocation({ lat: 41.2995, lng: 69.2401 });
-        }
+          setUserLocation({ lat: 41.2995, lng: 69.2401 }); // Default to Tashkent
+        },
+        { enableHighAccuracy: true }
       );
     } else {
-      // Geolocation not supported, default to Tashkent
-      setUserLocation({ lat: 41.2995, lng: 69.2401 });
+      setUserLocation({ lat: 41.2995, lng: 69.2401 }); // Default to Tashkent
     }
   }, []);
 
@@ -645,7 +649,10 @@ const App = () => {
             <MapView 
               shops={allShops} 
               userLocation={userLocation}
-              onShopClick={(shop) => setSelectedShop(shop)}
+              onShopClick={(shop) => {
+                setSelectedShop(shop);
+                setActiveTab('Home'); // Switch back to home to see detail
+              }}
             />
           </div>
 
@@ -688,7 +695,7 @@ const App = () => {
           <div className="flex justify-around py-3">
             <NavItem icon={Home} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
             <NavItem icon={MapIcon} label="Map" active={activeTab === 'Map'} onClick={() => setActiveTab('Map')} />
-            <NavItem icon={ShoppingCart} label="Delivery" active={activeTab === 'Delivery'} onClick={() => setActiveTab('Delivery')} />
+            <NavItem icon={ShoppingCart} label="Delivery" active={T} onClick={() => setActiveTab('Delivery')} />
             <NavItem icon={User} label="Profile" active={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
           </div>
         </footer>
@@ -705,6 +712,17 @@ const App = () => {
         )}
 
       </div> {/* End Mobile Frame */}
+      
+      {/* Animation CSS */}
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+        .animate-slideIn {
+          animation: slideIn 0.2s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
