@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
   Search, Compass, ShoppingCart, Bell, User, Home, Map as MapIcon, 
-  X, ChevronDown, Clock, MapPin, Tag, Building, ArrowLeft, Star, Heart, Share2, Phone
+  X, ChevronDown, Clock, MapPin, Tag, Building, ArrowLeft, Star, Heart, Share2, Phone,
+  Rss, MessageCircle, Loader2 // <-- THE FIX IS HERE
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 
@@ -9,10 +10,11 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
-  createUserWithEmailAndPassword, signInWithEmailAndPassword
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
 } from 'firebase/auth';
 import { 
-  getFirestore, collection, query, onSnapshot, doc, getDoc
+  getFirestore, collection, query, onSnapshot, doc, getDoc,
+  collectionGroup, where, orderBy, setDoc, deleteDoc
 } from 'firebase/firestore';
 
 // --- Local & Global Configuration ---
@@ -59,6 +61,22 @@ function getDistance(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c; // distance in km
   return distance * 1000; // distance in meters
+}
+
+// --- Time Ago Function ---
+function timeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + "y ago";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + "mo ago";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + "d ago";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + "h ago";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + "m ago";
+  return Math.floor(seconds) + "s ago";
 }
 
 // --- Reusable Components ---
@@ -121,7 +139,7 @@ const NearbyCategory = ({ title, icon: Icon, onFilterSelect, isSelected }) => (
 );
 
 const NavItem = ({ icon: Icon, label, active, onClick }) => (
-  <button onClick={onClick} className="flex flex-col items-center text-xs group focus:outline-none">
+  <button onClick={onClick} className="flex flex-col items-center text-xs group focus:outline-none w-1/5">
     <Icon className={`w-6 h-6 transition duration-150 ${active ? 'text-[#C67C43]' : 'text-gray-500 group-hover:text-[#C67C43]'}`} />
     <span className={`mt-1 font-medium ${active ? 'text-[#C67C43]' : 'text-gray-500'}`}>{label}</span>
   </button>
@@ -184,7 +202,7 @@ const MapView = ({ shops, userLocation, onShopClick }) => {
   };
 
   if (loadError) return <div>Error loading maps. Make sure your Google Maps API Key is correct in .env and you've installed @react-google-maps/api.</div>;
-  if (!isLoaded) return <div>Loading Map...</div>;
+  if (!isLoaded) return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin" style={{ color: Colors.primary }} /></div>;
 
   return (
     <GoogleMap
@@ -232,7 +250,7 @@ const MapView = ({ shops, userLocation, onShopClick }) => {
 };
 
 // --- Shop Detail Page Component ---
-const ShopDetailPage = ({ shop, onClose, db, appId, userLocation }) => {
+const ShopDetailPage = ({ shop, onClose, db, appId, userLocation, onFollow, isFollowing }) => {
   const [inventory, setInventory] = useState([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
 
@@ -240,7 +258,6 @@ const ShopDetailPage = ({ shop, onClose, db, appId, userLocation }) => {
   useEffect(() => {
     if (!shop || !db) return;
     setLoadingInventory(true);
-    // Path: /artifacts/{appId}/public/data/shops/{shopId}/inventory
     const inventoryRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops', shop.id, 'inventory');
     
     const unsubscribe = onSnapshot(inventoryRef, (snapshot) => {
@@ -278,7 +295,12 @@ const ShopDetailPage = ({ shop, onClose, db, appId, userLocation }) => {
               <ArrowLeft className="w-6 h-6" />
             </button>
             <div className="flex space-x-2">
-              <button className="p-2 rounded-full bg-gray-100 text-gray-600"><Heart className="w-5 h-5" /></button>
+              <button 
+                onClick={() => onFollow(shop.id)} 
+                className={`p-2 rounded-full transition-colors ${isFollowing ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-600'}`}
+              >
+                <Heart className={`w-5 h-5 ${isFollowing ? 'fill-current' : ''}`} />
+              </button>
               <button className="p-2 rounded-full bg-gray-100 text-gray-600"><Share2 className="w-5 h-5" /></button>
             </div>
         </div>
@@ -351,6 +373,116 @@ const ShopDetailPage = ({ shop, onClose, db, appId, userLocation }) => {
   );
 };
 
+// --- NEW: Feed Post Component ---
+const FeedPost = ({ post, shop }) => {
+  if (!shop) return null; // Don't render post if shop data isn't loaded
+  
+  return (
+    <div className="bg-white border-b border-gray-200">
+      {/* Post Header */}
+      <div className="flex items-center p-3">
+        <img 
+          src={shop.profilePicUrl || 'https://placehold.co/40x40/D2B48C/000?text=S'} 
+          alt={shop.name_uz}
+          className="w-10 h-10 rounded-full object-cover"
+        />
+        <div className="ml-3">
+          <p className="font-semibold text-sm">{shop.name_uz}</p>
+          <p className="text-xs text-gray-500">{timeAgo(post.createdAt.toDate())}</p>
+        </div>
+      </div>
+      
+      {/* Post Image */}
+      {post.imageUrl && (
+        <img src={post.imageUrl} alt="Post" className="w-full" />
+      )}
+      
+      {/* Post Content */}
+      <div className="p-3">
+        <p className="text-sm">{post.text}</p>
+      </div>
+
+      {/* Post Actions */}
+      <div className="flex space-x-4 p-2 border-t border-gray-100">
+        <button className="flex items-center space-x-1 text-gray-600 hover:text-red-500">
+          <Heart className="w-5 h-5" /> <span className="text-sm">Like</span>
+        </button>
+        <button className="flex items-center space-x-1 text-gray-600 hover:text-blue-500">
+          <MessageCircle className="w-5 h-5" /> <span className="text-sm">Comment</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// --- NEW: Feed Page ---
+const FeedPage = ({ db, appId, followingList, allShops }) => {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Create a quick lookup map for shop data
+  const shopsMap = useMemo(() => {
+    return allShops.reduce((acc, shop) => {
+      acc[shop.id] = shop;
+      return acc;
+    }, {});
+  }, [allShops]);
+
+  useEffect(() => {
+    if (!followingList) {
+        setLoading(false);
+        setPosts([]);
+        return;
+    }
+    if (followingList.length === 0) {
+      setLoading(false);
+      setPosts([]);
+      return;
+    }
+    
+    setLoading(true);
+    // This is the collectionGroup query.
+    // It requires the index we created in Firestore.
+    const postsQuery = query(
+      collectionGroup(db, 'posts'),
+      where('shopId', 'in', followingList),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const unsubscribe = onSnapshot(postsQuery, (snapshot) => {
+      const postList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPosts(postList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching feed posts:", error);
+      // This error often means the Firestore Index is missing or still building.
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [db, appId, followingList]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin" style={{ color: Colors.primary }} /></div>;
+  }
+
+  if (followingList.length === 0) {
+    return <div className="text-center p-8 text-gray-500">Your feed is empty. Follow some shops to see their posts here!</div>;
+  }
+
+  return (
+    <div className="flex-grow overflow-y-auto pb-24 bg-gray-100">
+      {posts.length > 0 ? (
+        posts.map(post => (
+          <FeedPost key={post.id} post={post} shop={shopsMap[post.shopId]} />
+        ))
+      ) : (
+        <div className="text-center p-8 text-gray-500">The shops you follow haven't posted anything yet.</div>
+      )}
+    </div>
+  );
+};
+
 // --- Optional Login Modal ---
 const AuthModal = ({ onClose, auth, setNotification }) => {
   const [email, setEmail] = useState('');
@@ -401,7 +533,7 @@ const AuthModal = ({ onClose, auth, setNotification }) => {
             className="w-full py-3 rounded-lg text-white font-semibold transition-all duration-300 ease-in-out flex items-center justify-center"
             style={{ backgroundColor: Colors.primary, opacity: loading ? 0.7 : 1 }}
           >
-            {loading ? <X className="animate-spin" /> : (isLogin ? 'Log In' : 'Sign Up')}
+            {loading ? <Loader2 className="animate-spin" /> : (isLogin ? 'Log In' : 'Sign Up')}
           </button>
         </form>
         <button
@@ -439,18 +571,20 @@ const App = () => {
   const [auth, setAuth] = useState(null);
   const [authUser, setAuthUser] = useState(null); // Full auth user object
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null); // Stores anonymous or logged-in UID
   
   // Data State
   const [allShops, setAllShops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [followingList, setFollowingList] = useState([]); // List of shop IDs user follows
 
   // UI/Interaction State
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState(null);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [selectedShop, setSelectedShop] = useState(null); // For the detail page
-  const [activeTab, setActiveTab] = useState('Home'); // Home, Map, Delivery, Profile
+  const [activeTab, setActiveTab] = useState('Home'); // Home, Feed, Map, Delivery, Profile
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [notification, setNotification] = useState('');
   
@@ -472,10 +606,12 @@ const App = () => {
       setAuth(firebaseAuth);
 
       const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-        setAuthUser(user); // Store the full user object
-        setIsAuthReady(true);
         if (user) {
-          console.log(`User signed in: ${user.uid}`);
+          // User is signed in (either logged-in or anonymous)
+          setAuthUser(user);
+          setCurrentUserId(user.uid);
+          setIsAuthReady(true);
+          console.log(`User signed in: ${user.uid} (Anon: ${user.isAnonymous})`);
         } else {
           // No user, sign in anonymously for browsing
           signInAnonymously(firebaseAuth).catch(err => console.error("Anon sign-in failed:", err));
@@ -509,26 +645,40 @@ const App = () => {
     }
   }, []);
 
-  // 3. Fetch Real-time Data
+  // 3. Fetch Real-time Data (Shops & Following List)
   useEffect(() => {
-    if (!isAuthReady || !db) return;
+    if (!isAuthReady || !db || !currentUserId) return;
+    
+    // Fetch Shops
     setLoading(true);
     const shopsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops');
-    
-    const unsubscribe = onSnapshot(shopsCollectionRef, (snapshot) => {
-      const shopList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    const shopsUnsub = onSnapshot(shopsCollectionRef, (snapshot) => {
+      const shopList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAllShops(shopList);
       setLoading(false);
     }, (error) => {
-      console.error("Firestore onSnapshot error:", error);
+      console.error("Firestore onSnapshot error (Shops):", error);
       setError("Failed to load shop data. Check Firebase Rules.");
       setLoading(false);
     });
-    return () => unsubscribe();
-  }, [isAuthReady, db]);
+
+    // Fetch User's Following List
+    // This is a private path: .../users/{userId}/following
+    const followingCollectionRef = collection(db, 'artifacts', appId, 'users', currentUserId, 'following');
+    const followingUnsub = onSnapshot(followingCollectionRef, (snapshot) => {
+      const shopIdList = snapshot.docs.map(doc => doc.id);
+      setFollowingList(shopIdList);
+      console.log("Updated following list:", shopIdList);
+    }, (error) => {
+      console.error("Firestore onSnapshot error (Following):", error);
+      setError("Failed to load user data. Check Firebase Rules.");
+    });
+
+    return () => {
+      shopsUnsub();
+      followingUnsub();
+    };
+  }, [isAuthReady, db, currentUserId, appId]); // Rerun when user logs in/out
 
   // 4. Memoized Filtering Logic
   const filteredShops = useMemo(() => {
@@ -556,6 +706,33 @@ const App = () => {
     setFilterCategory(prev => prev === category ? null : category);
   };
   
+  // NEW: Follow/Unfollow Logic
+  const handleFollow = async (shopId) => {
+    if (!currentUserId || !db) return;
+    
+    const followRef = doc(db, 'artifacts', appId, 'users', currentUserId, 'following', shopId);
+    
+    if (followingList.includes(shopId)) {
+      // Unfollow
+      try {
+        await deleteDoc(followRef);
+        setNotification("Unfollowed shop.");
+      } catch (e) {
+        console.error("Error unfollowing:", e);
+        setNotification("Error unfollowing shop.");
+      }
+    } else {
+      // Follow
+      try {
+        await setDoc(followRef, { followedAt: new Date() });
+        setNotification("Followed shop!");
+      } catch (e) {
+        console.error("Error following:", e);
+        setNotification("Error following shop.");
+      }
+    }
+  };
+
   const getPageTitle = () => {
     if (isSearchActive) return "Search Results";
     if (filterCategory) return `${filterCategory}s`;
@@ -568,7 +745,7 @@ const App = () => {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-red-100 p-4 text-center">
-        <p className="text-red-700 font-medium">Error: {error}</p>
+        <p className="text-red-700 font-medium">Error: {error}. Make sure you created the Firestore Index for 'posts'.</p>
       </div>
     );
   }
@@ -644,6 +821,14 @@ const App = () => {
             </main>
           </div>
           
+          {/* --- NEW: Feed Tab --- */}
+          <div className={`flex-grow flex flex-col ${activeTab === 'Feed' ? '' : 'hidden'}`}>
+             <header className="bg-white border-b border-gray-100 z-10 sticky top-0 p-4">
+                <h2 className="text-xl font-bold text-center" style={{ color: Colors.primary }}>Your Feed</h2>
+             </header>
+             <FeedPage db={db} appId={appId} followingList={followingList} allShops={allShops} />
+          </div>
+
           {/* --- Map Tab --- */}
           <div className={`flex-grow ${activeTab === 'Map' ? '' : 'hidden'}`}>
             <MapView 
@@ -669,7 +854,7 @@ const App = () => {
                 <p className="text-gray-600 mb-4">{authUser.email}</p>
                 <button 
                   onClick={() => {
-                    auth.signOut();
+                    signOut(auth);
                     setNotification('Logged out.');
                   }}
                   className="w-full py-3 rounded-lg text-white font-semibold" style={{backgroundColor: Colors.primary}}>
@@ -690,12 +875,14 @@ const App = () => {
           </div>
         </div>
 
-        {/* --- Sticky Bottom Navigation Bar --- */}
+        {/* --- Sticky Bottom Navigation Bar (5 TABS) --- */}
         <footer className="sticky bottom-0 w-full max-w-md mx-auto bg-white border-t border-gray-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10">
           <div className="flex justify-around py-3">
             <NavItem icon={Home} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
+            <NavItem icon={Rss} label="Feed" active={activeTab === 'Feed'} onClick={() => setActiveTab('Feed')} />
             <NavItem icon={MapIcon} label="Map" active={activeTab === 'Map'} onClick={() => setActiveTab('Map')} />
-            <NavItem icon={ShoppingCart} label="Delivery" active={T} onClick={() => setActiveTab('Delivery')} />
+            <NavItem icon={ShoppingCart} label="Delivery" active={activeTab === 'Delivery'} onClick={() => setActiveTab('Delivery')} />
+            {/* THIS IS THE FIX: */}
             <NavItem icon={User} label="Profile" active={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
           </div>
         </footer>
@@ -708,6 +895,8 @@ const App = () => {
             db={db}
             appId={appId}
             userLocation={userLocation}
+            onFollow={handleFollow}
+            isFollowing={followingList.includes(selectedShop.id)}
           />
         )}
 
