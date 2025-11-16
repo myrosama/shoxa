@@ -1097,7 +1097,9 @@ const App = () => {
         </div>
 
         {/* --- Shared Components (STICKY FOOTER) --- */}
-        <footer className="w-full max-w-md mx-auto bg-white border-t border-gray-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10">
+        {/* FIX: Added 'sticky bottom-0' to make the footer stay at the bottom 
+        */}
+        <footer className="sticky bottom-0 w-full max-w-md mx-auto bg-white border-t border-gray-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10">
           <div className="flex justify-around py-3">
             <NavItem icon={Home} label="Home" active={activeTab === 'Home'} onClick={() => { setActiveTab('Home'); setCurrentView('home'); }} />
             <NavItem icon={Rss} label="Feed" active={activeTab === 'Feed'} onClick={() => setActiveTab('Feed')} />
