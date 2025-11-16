@@ -4,7 +4,10 @@
 "private": true,
 "scripts": {
 "start": "react-scripts start",
-"start-admin": "react-scripts start"
+"start-admin": "react-scripts start",
+"build": "react-scripts build",
+"test": "react-scripts test",
+"eject": "react-scripts eject"
 },
 "dependencies": {
 "@react-google-maps/api": "^2.19.3",
