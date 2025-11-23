@@ -436,6 +436,20 @@ const CartPage = ({ cart, onUpdateQuantity, setNotification }) => {
     return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   }, [cart]);
   
+  // FIX: This hook MUST be called before any early returns (like the 'if cart is empty' check)
+  // Group items by shop
+  const groupedCart = useMemo(() => {
+    return cart.reduce((acc, item) => {
+      const shopId = item.shopId || 'shoxa';
+      const shopName = item.shopName || 'SHOXA General Store';
+      if (!acc[shopId]) {
+        acc[shopId] = { shopName: shopName, items: [] };
+      }
+      acc[shopId].items.push(item);
+      return acc;
+    }, {});
+  }, [cart]);
+
   const deliveryFee = 10000; // Mock delivery fee
   const total = subtotal + deliveryFee;
 
@@ -458,18 +472,7 @@ const CartPage = ({ cart, onUpdateQuantity, setNotification }) => {
     );
   }
   
-  // Group items by shop
-  const groupedCart = useMemo(() => {
-    return cart.reduce((acc, item) => {
-      const shopId = item.shopId || 'shoxa';
-      const shopName = item.shopName || 'SHOXA General Store';
-      if (!acc[shopId]) {
-        acc[shopId] = { shopName: shopName, items: [] };
-      }
-      acc[shopId].items.push(item);
-      return acc;
-    }, {});
-  }, [cart]);
+  // DELETED: The duplicate 'groupedCart' declaration was here. This fixes the bug.
 
   return (
     <div className="flex-grow flex flex-col pb-24 bg-gray-100">
@@ -515,7 +518,7 @@ const CartPage = ({ cart, onUpdateQuantity, setNotification }) => {
         <div className="space-y-1 text-sm">
           <div className="flex justify-between"><p>Subtotal:</p> <p>{subtotal.toLocaleString()} UZS</p></div>
           <div className="flex justify-between"><p>Delivery Fee:</p> <p>{deliveryFee.toLocaleString()} UZS</p></div>
-          {/* BUG FIX: Removed the extra <p> tag that was here */}
+          {/* BUG FIX: Removed the extra `>` that caused the compile error */}
           <div className="flex justify-between font-bold text-lg mt-1"><p>Total:</p><p>{total.toLocaleString()} UZS</p></div>
         </div>
         <button className="w-full py-3 mt-4 rounded-lg text-white font-semibold text-lg flex items-center justify-center" style={{backgroundColor: Colors.primary}}>
@@ -659,7 +662,7 @@ const NavigationModal = ({ shop, userLocation, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-11/1WELCOME_MESSAGEst-sm" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-xl p-6 w-11/12 max-w-sm" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold text-gray-800 mb-4">Navigate to {shop.name_uz}</h2>
         <div className="flex justify-around mb-6 text-center">
           <div><p className="text-2xl font-bold" style={{color: Colors.primary}}>{distance}</p><p className="text-sm text-gray-500">km</p></div>
@@ -773,6 +776,7 @@ const App = () => {
   // 3. Fetch Real-time Data
   useEffect(() => {
     if (!isAuthReady || !db || !currentUserId) return;
+    setLoading(true);
     
     // Fetch Shops
     const shopsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops');
@@ -782,16 +786,20 @@ const App = () => {
       
       const myShop = shopList.find(s => s.owner_uid === currentUserId);
       setUserShopId(myShop ? myShop.id : null);
-    }, (err) => setError("Failed to load shops. Check Rules."));
+    }, (err) => {
+      setError("Failed to load shops. Check Rules.");
+      setLoading(false);
+    });
 
     // Fetch User's Following List
     const followingRef = collection(db, 'artifacts', appId, 'users', currentUserId, 'following');
     const followingUnsub = onSnapshot(followingRef, (snapshot) => {
       setFollowingList(snapshot.docs.map(doc => doc.id));
-    }, (err) => setError("Failed to load user data. Check Rules."));
+    }, (err) => {
+      setError("Failed to load user data. Check Rules.");
+    });
     
-    // Fetch ALL products for carousel
-    // UPDATED: Added orderBy('name') to match the new index
+    // Fetch ALL products for carousel (MATCHING THE INDEX)
     const productsQuery = query(collectionGroup(db, 'inventory'), orderBy('name'));
     const productsUnsub = onSnapshot(productsQuery, (snapshot) => {
       const productList = snapshot.docs.map(doc => {
@@ -813,10 +821,10 @@ const App = () => {
       }
 
     }, (err) => { 
-      console.warn("Product carousel query failed. Check Firestore index for 'inventory'.");
+      console.warn("Product carousel query failed. Check Firestore index for 'inventory' (name, ascending).");
+      // Don't set a hard error, just warn in console
     });
     
-    // Set loading to false only after all initial fetches are attempted
     setLoading(false);
 
     return () => { shopsUnsub(); followingUnsub(); productsUnsub(); };
@@ -941,8 +949,8 @@ const App = () => {
       <div className="w-full max-w-md h-screen shadow-2xl bg-white flex flex-col relative overflow-hidden">
         
         {/* --- View: Home Page (includes sub-pages) --- */}
+        {/* This div logic ensures the sticky footer works */}
         <div className={`flex-grow w-full h-full transition-transform duration-300 ease-in-out ${currentView === 'home' ? 'translate-x-0' : '-translate-x-full'}`}>
-          {/* This container ensures footer is at the bottom */}
           <div className="flex flex-col h-full">
 
             {/* --- Home Tab --- */}
@@ -986,7 +994,7 @@ const App = () => {
                 <div className="px-4 mb-6">
                   <div className="flex justify-between items-center mb-3">
                     <h2 className={`text-lg font-bold ${Colors.text}`}>{getPageTitle()} ({homeFilteredShops.length})</h2>
-                    {showDefaultView && <button onClick={() => setCurrentView('allShops')} className="text-sm font-medium text-[#C67C43]">See All </button>}
+                    {showDefaultView && <button onClick={() => setCurrentView('allShops')} className="text-sm font-medium text-[#C67C43]">See All</button>}
                   </div>
                   {loading ? <p className="text-gray-500">Fetching...</p> : homeFilteredShops.length > 0 ? (
                     <div className="grid grid-cols-2 gap-4">
@@ -1045,7 +1053,7 @@ const App = () => {
                       <Briefcase className="w-5 h-5 inline-block mr-2" /> View My Shop
                     </button>
                   )}
-                  <button onClick={() => signOut(auth)} className="w-full py-3 rounded-lg text-white font-semibold" style={{backgroundColor: Colors.primary}}>
+                  <button onClick={() => { signOut(auth); setNotification('Logged out.'); }} className="w-full py-3 rounded-lg text-white font-semibold" style={{backgroundColor: Colors.primary}}>
                     Log Out
                   </button>
                 </div>
@@ -1097,8 +1105,7 @@ const App = () => {
         </div>
 
         {/* --- Shared Components (STICKY FOOTER) --- */}
-        {/* FIX: Added 'sticky bottom-0' to make the footer stay at the bottom 
-        */}
+        {/* FIX: The sticky footer is now outside the scrolling containers */}
         <footer className="sticky bottom-0 w-full max-w-md mx-auto bg-white border-t border-gray-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] z-10">
           <div className="flex justify-around py-3">
             <NavItem icon={Home} label="Home" active={activeTab === 'Home'} onClick={() => { setActiveTab('Home'); setCurrentView('home'); }} />
@@ -1140,7 +1147,8 @@ const App = () => {
         }
         .animate-infinite-scroll {
           /* 10 products * (144px card + 16px margin) = 1600px. * 2 sets = 3200px */
-          width: 3200px; /* Increased width for more products */
+          /* Adjust width based on your number of products */
+          width: 3200px; 
           animation: scroll 60s linear infinite; /* Slower scroll */
         }
         .group-hover\\:pause:hover {
