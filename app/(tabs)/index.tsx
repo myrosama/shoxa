@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -7,15 +7,13 @@ import {
   ScrollView, 
   Image, 
   TouchableOpacity, 
-  FlatList,
   Dimensions,
   StatusBar,
   ActivityIndicator,
   Platform,
-  Animated // Import Animation Library
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 // --- FIREBASE IMPORTS ---
@@ -33,15 +31,17 @@ import {
   onSnapshot 
 } from 'firebase/firestore';
 
-// --- CONFIG ---
+// --- FIREBASE CONFIG ---
 const firebaseConfig = {
-  apiKey: "AIzaSy...", // PASTE KEY
-  authDomain: "shoxa-app.firebaseapp.com",
-  projectId: "shoxa-app",
-  storageBucket: "shoxa-app.appspot.com",
-  messagingSenderId: "SENDER_ID",
-  appId: "APP_ID"
+  apiKey: "AIzaSyDd0PkrXLPT8NDKEJuwTUmFb1o0SPuHN7U",
+  authDomain: "shoxabranch.firebaseapp.com",
+  projectId: "shoxabranch",
+  storageBucket: "shoxabranch.firebasestorage.app",
+  messagingSenderId: "274790573053",
+  appId: "1:274790573053:web:7f0df0f443e27c22bcef94",
+  measurementId: "G-DYXYK6NCYK"
 };
+
 
 // --- INIT ---
 let db, auth;
@@ -60,327 +60,254 @@ try {
 }
 
 // --- THEME ---
+// We keep the SHOXA colors but apply the Uzum Layout
 const COLORS = {
-  bg: '#FFF9F2',
-  primary: '#E86A33',
+  bg: '#F5F5F5',       // Light Gray bg like Uzum
+  headerBg: '#FFFFFF',
+  primary: '#E86A33',  // SHOXA Orange
   secondary: '#2D2D2D',
   textGray: '#888888',
-  inputBg: '#F2F4F8', // Slightly gray for the simplified search
-  glass: 'rgba(255, 255, 255, 0.9)', // Glassmorphism effect
+  glass: 'rgba(255, 255, 255, 0.95)',
+  badgeBlack: 'rgba(0,0,0,0.7)',
+  purple: '#7B61FF',   // For "Aksiyalar" badge
+  yellow: '#FFD700',   // For "Top" badge
 };
 
 const { width } = Dimensions.get('window');
 
-// --- DUMMY DATA ---
-const PROMOTIONS = [
-  { id: '1', title: '50% OFF', subtitle: 'On Plov Center', color: '#FFE0B2' },
-  { id: '2', title: 'Free Delivery', subtitle: 'Orders > 100k', color: '#C8E6C9' },
-  { id: '3', title: 'New Arrival', subtitle: 'Autumn Collection', color: '#BBDEFB' },
+// --- DATA ---
+const BANNERS = [
+  { id: '1', image: 'https://img.freepik.com/free-psd/food-menu-restaurant-web-banner-template_23-2148962365.jpg', title: 'Pepsi Combo' },
+  { id: '2', image: 'https://img.freepik.com/free-psd/horizontal-banner-template-big-sale-with-woman-shopping-bags_23-2148786755.jpg', title: 'Sale 50%' },
+  { id: '3', image: 'https://img.freepik.com/free-vector/flat-supermarket-twitch-banner_23-2149356079.jpg', title: 'Market' },
 ];
 
 const CATEGORIES = [
-  { id: '1', name: 'All', icon: 'grid-outline', type: 'all' },
-  { id: '2', name: 'Shops', icon: 'cart-outline', type: 'Shop' },
-  { id: '3', name: 'Food', icon: 'fast-food-outline', type: 'Restaurant' },
-  { id: '4', name: 'Hospital', icon: 'medkit-outline', type: 'Hospital' },
-  { id: '5', name: 'Services', icon: 'construct-outline', type: 'Service' },
+  { id: '1', name: 'Lavash', image: 'https://cdn-icons-png.flaticon.com/512/3014/3014520.png', type: 'fastfood' },
+  { id: '2', name: 'Shops', image: 'https://cdn-icons-png.flaticon.com/512/3081/3081559.png', type: 'shop' },
+  { id: '3', name: 'Burger', image: 'https://cdn-icons-png.flaticon.com/512/3075/3075977.png', type: 'burger' },
+  { id: '4', name: 'National', image: 'https://cdn-icons-png.flaticon.com/512/1065/1065715.png', type: 'national' },
+  { id: '5', name: 'Pizza', image: 'https://cdn-icons-png.flaticon.com/512/1404/1404945.png', type: 'pizza' },
+];
+
+const FILTERS = [
+  { id: '1', label: '', icon: 'options-outline', width: 40 }, // Sort Icon
+  { id: '2', label: 'Aksiyalar', icon: 'flame', color: '#FF4081' },
+  { id: '3', label: 'Top', icon: 'ribbon', color: '#FFD700' },
+  { id: '4', label: 'Yangiliklar', icon: 'sparkles', color: '#7B61FF' },
+  { id: '5', label: 'Fast Delivery', icon: 'bicycle', color: COLORS.primary },
 ];
 
 export default function HomeScreen() {
-  const [activeTab, setActiveTab] = useState('Home'); 
-  const [activeCategory, setActiveCategory] = useState('1'); 
+  const [activeTab, setActiveTab] = useState('Home');
+  const [activeCategory, setActiveCategory] = useState(null); 
   const [searchQuery, setSearchQuery] = useState('');
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
-
-  // --- ANIMATION STATE ---
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const headerTranslateY = useRef(new Animated.Value(-150)).current; // Start hidden
-  const lastScrollY = useRef(0);
-  const [isStickyVisible, setIsStickyVisible] = useState(false);
 
   // --- DATA FETCHING ---
   useEffect(() => {
     if (!auth || !db) return;
-    const unsubAuth = onAuthStateChanged(auth, (u) => setUser(u));
     const shopsRef = collection(db, 'artifacts', firebaseConfig.appId || 'shoxa_app', 'public', 'data', 'shops');
     const unsubShops = onSnapshot(query(shopsRef), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setShops(data);
       setLoading(false);
     }, (error) => {
-      console.log("Firestore Error:", error.message);
+      // Dummy data fallback if permission denied
       setLoading(false);
     });
-    return () => { unsubAuth(); unsubShops(); };
+    return () => unsubShops();
   }, []);
 
-  // --- FILTERING ---
+  // --- FILTERING LOGIC ---
   const filteredShops = useMemo(() => {
     let result = shops;
     if (result.length === 0 && !loading) {
-       // Dummy Data fallback
+       // High Quality Dummy Data matching Screenshots
        result = [
-         { id: '1', name_uz: 'Korzinka', type: 'Shop', rating: 4.8 },
-         { id: '2', name_uz: 'Oq Tep Lavash', type: 'Restaurant', rating: 4.5 },
-         { id: '3', name_uz: 'City Med', type: 'Hospital', rating: 4.9 },
-         { id: '4', name_uz: 'Makro', type: 'Shop', rating: 4.2 },
-         { id: '5', name_uz: 'Evos', type: 'Restaurant', rating: 4.6 },
+         { id: '1', name_uz: 'Oqtepa Lavash', type: 'Fast Food', rating: 4.7, time: '25-35 daq', badge: '1+1', image: 'https://images.unsplash.com/photo-1626804475297-411d0c285270?q=80&w=1000' },
+         { id: '2', name_uz: 'Garage Burger', type: 'Burger', rating: 4.8, time: '30-40 daq', badge: '-20%', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=1000' },
+         { id: '3', name_uz: 'Fids Monro', type: 'Chicken', rating: 4.6, time: '35-45 daq', image: 'https://images.unsplash.com/photo-1513639776629-7b611d16326e?q=80&w=1000' },
+         { id: '4', name_uz: 'KFC', type: 'Chicken', rating: 4.5, time: '20-30 daq', badge: 'Top', image: 'https://images.unsplash.com/photo-1513639776629-7b611d16326e?q=80&w=1000' },
        ];
     }
-    const selectedType = CATEGORIES.find(c => c.id === activeCategory)?.type;
-    if (selectedType && selectedType !== 'all') {
-      result = result.filter(s => s.type === selectedType);
-    }
     if (searchQuery) {
-      result = result.filter(s => 
-        (s.name_uz && s.name_uz.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (s.type && s.type.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
+      result = result.filter(s => s.name_uz.toLowerCase().includes(searchQuery.toLowerCase()));
     }
     return result;
-  }, [shops, activeCategory, loading, searchQuery]);
+  }, [shops, searchQuery, loading]);
 
-  // --- SCROLL HANDLER (THE MAGIC) ---
-  const handleScroll = (event) => {
-    const currentY = event.nativeEvent.contentOffset.y;
-    const diff = currentY - lastScrollY.current;
-    
-    // Logic: 
-    // 1. If we are at the very top (y < 80), hide sticky header
-    // 2. If we scroll DOWN (diff > 0), hide sticky header
-    // 3. If we scroll UP (diff < 0) AND we are deep in page (y > 100), show sticky header
+  // --- COMPONENTS ---
 
-    if (currentY < 100) {
-      // At the top
-      if (isStickyVisible) {
-        setIsStickyVisible(false);
-        Animated.timing(headerTranslateY, { toValue: -200, duration: 300, useNativeDriver: true }).start();
-      }
-    } else if (diff > 0) {
-      // Scrolling Down
-      if (isStickyVisible) {
-        setIsStickyVisible(false);
-        Animated.timing(headerTranslateY, { toValue: -200, duration: 300, useNativeDriver: true }).start();
-      }
-    } else if (diff < -5) {
-      // Scrolling Up
-      if (!isStickyVisible) {
-        setIsStickyVisible(true);
-        Animated.timing(headerTranslateY, { toValue: 0, duration: 300, useNativeDriver: true }).start();
-      }
-    }
+  const BannerItem = ({ item }) => (
+    <View style={styles.bannerWrapper}>
+      <Image source={{ uri: item.image }} style={styles.bannerImage} />
+    </View>
+  );
 
-    lastScrollY.current = currentY;
-  };
-
-  // --- SUB-COMPONENTS ---
-  const PromotionCard = ({ item }) => (
-    <TouchableOpacity style={[styles.promoCard, { backgroundColor: item.color }]}>
-      <View>
-        <Text style={styles.promoTitle}>{item.title}</Text>
-        <Text style={styles.promoSubtitle}>{item.subtitle}</Text>
+  const CircularCategory = ({ item, isActive, onPress }) => (
+    <TouchableOpacity style={styles.catItem} onPress={onPress}>
+      <View style={[styles.catCircle, isActive && styles.catCircleActive]}>
+        <Image source={{ uri: item.image }} style={styles.catImage} />
       </View>
-      <Ionicons name="pricetag" size={20} color="rgba(0,0,0,0.2)" style={{position: 'absolute', right: 10, bottom: 10}} />
+      <Text style={[styles.catText, isActive && styles.catTextActive]}>{item.name}</Text>
     </TouchableOpacity>
   );
 
+  const FilterChip = ({ item }) => (
+    <TouchableOpacity style={[styles.filterChip, item.width && { width: item.width, paddingHorizontal: 0, justifyContent:'center' }]}>
+      {item.icon === 'options-outline' ? (
+         <Ionicons name="options-outline" size={20} color="#333" />
+      ) : (
+         <>
+           <Ionicons name={item.icon} size={16} color={item.color} />
+           <Text style={styles.filterText}>{item.label}</Text>
+         </>
+      )}
+    </TouchableOpacity>
+  );
+
+  // The "Uzum-Style" Shop Card
   const ShopCard = ({ item }) => (
-    <TouchableOpacity style={styles.card}>
-      <View style={styles.cardImageContainer}>
+    <TouchableOpacity style={styles.shopCard}>
+      <View style={styles.shopImageContainer}>
         <Image 
-          source={{ uri: item.profilePicUrl || item.image || 'https://placehold.co/400x300/C67C43/FFFFFF/png' }} 
-          style={styles.cardImage} 
+          source={{ uri: item.profilePicUrl || item.image }} 
+          style={styles.shopImage} 
         />
-        <View style={styles.ratingBadge}>
-          <Ionicons name="star" size={10} color="#FFD700" />
-          <Text style={styles.ratingText}>{item.rating}</Text>
+        {/* Badges Overlaid on Image */}
+        {item.badge && (
+          <View style={styles.badgeLeft}>
+             <Ionicons name="flame" size={12} color="#FFF" style={{marginRight: 2}} />
+             <Text style={styles.badgeText}>{item.badge}</Text>
+          </View>
+        )}
+        <View style={styles.badgeRight}>
+          <Text style={styles.badgeText}>{item.time || '30-40 daq'}</Text>
         </View>
       </View>
-      <View style={styles.cardContent}>
-        <View style={{flex: 1}}>
-            <Text style={styles.cardTitle} numberOfLines={1}>{item.name_uz || item.name_en || 'Shop Name'}</Text>
-            <Text style={styles.cardCategory}>{item.type}</Text>
-        </View>
-        <TouchableOpacity style={styles.addButton}>
-            <Ionicons name="arrow-forward" size={18} color="#FFF" />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
 
-  const CategoryPill = ({ item, isActive, onPress, small }) => (
-    <TouchableOpacity 
-      onPress={onPress} 
-      style={[
-        small ? styles.pillSmall : styles.categoryPill, 
-        isActive ? styles.categoryPillActive : styles.categoryPillInactive
-      ]}
-    >
-      {!small && <Ionicons name={item.icon} size={18} color={isActive ? '#FFF' : COLORS.secondary} />}
-      <Text style={[
-        styles.categoryText, 
-        isActive ? { color: '#FFF' } : { color: COLORS.secondary },
-        small && { marginLeft: 0 }
-      ]}>
-        {item.name}
-      </Text>
+      <View style={styles.shopContent}>
+        <View style={styles.shopHeader}>
+          <Text style={styles.shopTitle}>{item.name_uz || item.name_en}</Text>
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={14} color="#333" />
+            <Text style={styles.ratingNum}>{item.rating}</Text>
+          </View>
+        </View>
+        <Text style={styles.shopSubtitle}>{item.type} • Delivery 10,000 UZS</Text>
+      </View>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
-      
-      {/* 1. STICKY SIMPLIFIED HEADER (Hidden initially) */}
-      <Animated.View style={[styles.stickyHeader, { transform: [{ translateY: headerTranslateY }] }]}>
-        <SafeAreaView edges={['top']}>
-          <View style={styles.stickyContent}>
-            {/* Logo/Title */}
-            <View style={styles.stickyTopRow}>
-                <Text style={styles.stickyLogo}>SHOXA</Text>
-                <View style={styles.stickyAvatar}>
-                    <Ionicons name="person" color={COLORS.primary} />
-                </View>
-            </View>
-            
-            {/* Input */}
-            <View style={styles.stickyInputContainer}>
-                <Ionicons name="search" size={18} color={COLORS.textGray} />
-                <TextInput 
-                    placeholder="Search shops & restaurants..." 
-                    style={styles.stickyInput}
-                    placeholderTextColor={COLORS.textGray}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-            </View>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
 
-            {/* Horizontal Filter Pills */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-                {CATEGORIES.map((cat) => (
-                    <CategoryPill 
-                        key={cat.id} 
-                        item={cat} 
-                        small
-                        isActive={activeCategory === cat.id}
-                        onPress={() => setActiveCategory(cat.id)}
-                    />
-                ))}
-            </ScrollView>
-          </View>
-        </SafeAreaView>
-      </Animated.View>
+      {/* FIXED TOP HEADER (Address) */}
+      <View style={styles.topHeader}>
+        <View style={styles.addressContainer}>
+           <Ionicons name="home" size={18} color={COLORS.primary} />
+           <Text style={styles.addressText} numberOfLines={1}>Sherodziy Ko'chasi, 1 • School</Text>
+           <Ionicons name="chevron-down" size={16} color="#333" />
+        </View>
+        <TouchableOpacity style={styles.settingsBtn}>
+          <Ionicons name="settings-outline" size={20} color="#333" />
+        </TouchableOpacity>
+      </View>
 
-      {/* 2. MAIN SCROLL CONTENT */}
+      {/* MAIN SCROLLVIEW */}
+      {/* stickyHeaderIndices={[1]} makes the SECOND child (index 1) stick to top */}
       <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={{ paddingBottom: 120 }}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
+        stickyHeaderIndices={[1]} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
       >
         
-        {/* ORIGINAL HEADER (Disappears on scroll) */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greetingText}>Good Morning,</Text>
-            <Text style={styles.welcomeText}>Welcome to SHOXA</Text>
-          </View>
-          <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png' }} style={styles.avatar} />
+        {/* Child 0: BANNERS (Scrolls away) */}
+        <View style={styles.bannerContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15 }}>
+            {BANNERS.map(b => <BannerItem key={b.id} item={b} />)}
+          </ScrollView>
         </View>
 
-        {/* ORIGINAL SEARCH BAR */}
-        <View style={styles.searchRow}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color={COLORS.textGray} />
+        {/* Child 1: STICKY HEADER (Search + Categories + Filters) */}
+        <View style={styles.stickyContainer}>
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#666" />
             <TextInput 
-              placeholder="Search stores, items..." 
-              style={styles.searchInput}
-              placeholderTextColor={COLORS.textGray}
+              placeholder="Taom va restoranlarni qidirish" 
+              style={styles.searchInput} 
+              placeholderTextColor="#999"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
           </View>
-          <TouchableOpacity style={styles.filterButton}>
-            <Ionicons name="options-outline" size={22} color="#FFF" />
-          </TouchableOpacity>
-        </View>
 
-        {/* PROMOTIONS (Rectangular) */}
-        <View style={styles.sectionContainer}>
-          <FlatList 
-            horizontal
-            data={PROMOTIONS}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => <PromotionCard item={item} />}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20 }}
-          />
-        </View>
-
-        {/* BANNER */}
-        <View style={styles.bannerContainer}>
-          <View style={styles.bannerContent}>
-            <Text style={styles.bannerTitle}>Explore Nearby</Text>
-            <Text style={styles.bannerSubtitle}>Find the best spots in Tashkent</Text>
-            <TouchableOpacity style={styles.bannerButton}>
-              <Text style={styles.bannerButtonText}>Open Map</Text>
-            </TouchableOpacity>
+          {/* Circular Categories */}
+          <View style={styles.categoriesContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15 }}>
+              {CATEGORIES.map(cat => (
+                <CircularCategory 
+                  key={cat.id} 
+                  item={cat} 
+                  isActive={activeCategory === cat.id}
+                  onPress={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
+                />
+              ))}
+            </ScrollView>
           </View>
-          <Image 
-            source={{ uri: 'https://img.freepik.com/free-photo/happy-woman-holding-laptop_23-2148002621.jpg' }} 
-            style={styles.bannerImage}
-          />
-        </View>
 
-        {/* RECOMMENDED SHOPS */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeader}>Recommended</Text>
-            <TouchableOpacity><Text style={styles.seeAllText}>See all</Text></TouchableOpacity>
-          </View>
-          
-          <View style={styles.shopGrid}>
-             {loading ? <ActivityIndicator color={COLORS.primary} /> : filteredShops.map((item) => (
-                <View key={item.id} style={styles.shopWrapper}>
-                    <ShopCard item={item} />
-                </View>
-             ))}
+          {/* Secondary Filters (New addition) */}
+          <View style={styles.filtersContainer}>
+             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 15 }}>
+               {FILTERS.map(f => <FilterChip key={f.id} item={f} />)}
+             </ScrollView>
           </View>
         </View>
+
+        {/* Child 2: CONTENT (Shops) */}
+        <View style={styles.contentContainer}>
+          <View style={styles.listHeader}>
+             <Text style={styles.listTitle}>{filteredShops.length} ta restoran topildi</Text>
+             <TouchableOpacity><Text style={styles.resetText}>Qayta sozlash</Text></TouchableOpacity>
+          </View>
+
+          {loading ? <ActivityIndicator color={COLORS.primary} style={{marginTop: 50}} /> : (
+            filteredShops.map(shop => <ShopCard key={shop.id} item={shop} />)
+          )}
+        </View>
+
       </ScrollView>
 
-      {/* 3. NEW STICKY BOTTOM NAVIGATION (Glassmorphism) */}
+      {/* STICKY BOTTOM NAV (Glassmorphism) */}
       <View style={styles.bottomNavContainer}>
-        {/* Background Blur Simulation using opacity */}
         <View style={styles.glassBackground} />
-        
         <View style={styles.navItemsRow}>
             <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Home')}>
-                <Ionicons name={activeTab === 'Home' ? "home" : "home-outline"} size={24} color={activeTab === 'Home' ? COLORS.primary : COLORS.secondary} />
-                <Text style={[styles.navText, activeTab === 'Home' && {color: COLORS.primary}]}>Home</Text>
+                <MaterialCommunityIcons name="silverware-fork-knife" size={24} color={activeTab === 'Home' ? COLORS.primary : COLORS.secondary} />
+                <Text style={[styles.navText, activeTab === 'Home' && {color: COLORS.primary}]}>Restoranlar</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Amenities')}>
-                <Ionicons name={activeTab === 'Amenities' ? "grid" : "grid-outline"} size={24} color={activeTab === 'Amenities' ? COLORS.primary : COLORS.secondary} />
-                <Text style={[styles.navText, activeTab === 'Amenities' && {color: COLORS.primary}]}>Amenities</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.navItemCart} onPress={() => setActiveTab('Cart')}>
-                <View style={styles.cartCircle}>
-                    <Ionicons name="cart" size={24} color="#FFF" />
+            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Cart')}>
+                <View style={{alignItems: 'center'}}>
+                    <Ionicons name="basket-outline" size={24} color={COLORS.secondary} />
+                    {/* Badge */}
+                    <View style={styles.navBadge}><Text style={styles.navBadgeText}>8</Text></View>
                 </View>
+                <Text style={styles.navText}>Savat</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Map')}>
-                <Ionicons name={activeTab === 'Map' ? "map" : "map-outline"} size={24} color={activeTab === 'Map' ? COLORS.primary : COLORS.secondary} />
-                <Text style={[styles.navText, activeTab === 'Map' && {color: COLORS.primary}]}>Map</Text>
+            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Orders')}>
+                <Ionicons name="receipt-outline" size={24} color={COLORS.secondary} />
+                <Text style={styles.navText}>Buyurtmalar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Profile')}>
-                <Ionicons name={activeTab === 'Profile' ? "person" : "person-outline"} size={24} color={activeTab === 'Profile' ? COLORS.primary : COLORS.secondary} />
-                <Text style={[styles.navText, activeTab === 'Profile' && {color: COLORS.primary}]}>Profile</Text>
+                <Ionicons name="person-circle-outline" size={26} color={COLORS.secondary} />
+                <Text style={styles.navText}>Profil</Text>
             </TouchableOpacity>
         </View>
       </View>
@@ -391,134 +318,100 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
-  
-  // --- STICKY HEADER (The New Part) ---
-  stickyHeader: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(255, 249, 242, 0.98)', // High opacity cream
-    zIndex: 100,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)',
-    shadowColor: "#000", shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5
-  },
-  stickyContent: { padding: 15, paddingTop: 10 },
-  stickyTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  stickyLogo: { fontSize: 20, fontWeight: '900', color: COLORS.primary, letterSpacing: 1 },
-  stickyAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#eee' },
-  stickyInputContainer: { 
-    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, 
-    borderRadius: 12, paddingHorizontal: 12, height: 44 
-  },
-  stickyInput: { flex: 1, marginLeft: 8, fontSize: 14, color: COLORS.secondary },
-  
-  // --- ORIGINAL HEADER ---
-  header: {
-    paddingHorizontal: 20, paddingTop: 10, marginBottom: 15,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  greetingText: { fontSize: 14, color: COLORS.textGray },
-  welcomeText: { fontSize: 22, fontWeight: '800', color: '#4E342E' },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF' },
 
+  // --- TOP HEADER ---
+  topHeader: {
+    backgroundColor: '#FFF', paddingHorizontal: 15, paddingVertical: 10,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+  },
+  addressContainer: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F2F5',
+    paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, flex: 1, marginRight: 10
+  },
+  addressText: { fontSize: 13, fontWeight: '600', color: '#333', marginHorizontal: 8, flex: 1 },
+  settingsBtn: { padding: 8 },
+
+  // --- BANNERS ---
+  bannerContainer: { backgroundColor: '#FFF', paddingVertical: 15 },
+  bannerWrapper: { marginRight: 10 },
+  bannerImage: { width: 300, height: 140, borderRadius: 16, resizeMode: 'cover' },
+
+  // --- STICKY CONTAINER (Search + Cats + Filters) ---
+  stickyContainer: { backgroundColor: '#FFF', paddingBottom: 10 },
+  
   // Search
-  searchRow: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 20 },
-  searchBar: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFF', borderRadius: 12, paddingHorizontal: 15, height: 48,
-    elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5,
+  searchContainer: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F2F5',
+    marginHorizontal: 15, paddingHorizontal: 12, height: 44, borderRadius: 12, marginBottom: 15
   },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: COLORS.secondary },
-  filterButton: {
-    width: 48, height: 48, backgroundColor: COLORS.primary, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center', marginLeft: 12,
-    elevation: 4, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8,
-  },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: '#333' },
 
-  // Banner
-  bannerContainer: {
-    marginHorizontal: 20, marginBottom: 25, height: 150,
-    backgroundColor: '#FFEBCD', borderRadius: 24, flexDirection: 'row', overflow: 'hidden',
+  // Circular Categories
+  categoriesContainer: { marginBottom: 15 },
+  catItem: { alignItems: 'center', marginRight: 18, width: 60 },
+  catCircle: {
+    width: 56, height: 56, borderRadius: 28, backgroundColor: '#F5F5F5',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 6
   },
-  bannerContent: { flex: 1, padding: 20, justifyContent: 'center', zIndex: 2 },
-  bannerTitle: { fontSize: 18, fontWeight: 'bold', color: '#4E342E' },
-  bannerSubtitle: { fontSize: 12, color: '#8D6E63', marginTop: 4, marginBottom: 12 },
-  bannerButton: { backgroundColor: COLORS.primary, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, alignSelf: 'flex-start' },
-  bannerButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
-  bannerImage: { width: 130, height: 160, resizeMode: 'cover', position: 'absolute', right: 0, bottom: 0 },
+  catCircleActive: { backgroundColor: '#FFF0E6', borderWidth: 2, borderColor: COLORS.primary },
+  catImage: { width: 32, height: 32, resizeMode: 'contain' },
+  catText: { fontSize: 11, color: '#333', textAlign: 'center', fontWeight: '500' },
+  catTextActive: { color: COLORS.primary, fontWeight: '700' },
 
-  // Sections
-  sectionContainer: { marginBottom: 20 },
-  sectionHeader: { fontSize: 18, fontWeight: 'bold', color: '#4E342E', marginBottom: 12, marginLeft: 20 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 },
-  seeAllText: { color: COLORS.primary, fontWeight: '600', fontSize: 14 },
+  // Filter Chips
+  filtersContainer: { },
+  filterChip: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
+    paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12, marginRight: 8,
+    borderWidth: 1, borderColor: '#EEE',
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1
+  },
+  filterText: { fontSize: 12, fontWeight: '600', color: '#333', marginLeft: 4 },
 
-  // Promotions
-  promoCard: {
-    width: 140, height: 70, borderRadius: 12, padding: 12, marginRight: 12, justifyContent: 'center',
-    elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3,
-  },
-  promoTitle: { fontSize: 14, fontWeight: 'bold', color: '#3E2723' },
-  promoSubtitle: { fontSize: 11, color: '#5D4037', marginTop: 2 },
+  // --- CONTENT ---
+  contentContainer: { paddingHorizontal: 15, paddingTop: 15 },
+  listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  listTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+  resetText: { fontSize: 13, color: COLORS.primary, fontWeight: '600', backgroundColor: '#FFF0E6', padding: 6, borderRadius: 8 },
 
-  // Categories / Pills
-  categoryPill: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16,
-    borderRadius: 20, marginRight: 10, backgroundColor: '#FFF',
-    borderWidth: 1, borderColor: 'transparent',
-    elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3,
+  // SHOP CARD
+  shopCard: {
+    backgroundColor: '#FFF', borderRadius: 20, marginBottom: 20, overflow: 'hidden',
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 3
   },
-  pillSmall: {
-    paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, marginRight: 8,
-    backgroundColor: '#FFF', borderWidth: 1, borderColor: '#eee', marginBottom: 5
+  shopImageContainer: { height: 180, width: '100%', position: 'relative' },
+  shopImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  badgeLeft: {
+    position: 'absolute', top: 15, left: 15, backgroundColor: '#FF4081',
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8
   },
-  categoryPillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  categoryPillInactive: { backgroundColor: '#FFF' },
-  categoryText: { marginLeft: 6, fontWeight: '600', fontSize: 13 },
+  badgeRight: {
+    position: 'absolute', bottom: 15, right: 15, backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8
+  },
+  badgeText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
+  
+  shopContent: { padding: 15 },
+  shopHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  shopTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  ratingContainer: { flexDirection: 'row', alignItems: 'center' },
+  ratingNum: { fontSize: 14, fontWeight: 'bold', marginLeft: 4 },
+  shopSubtitle: { fontSize: 13, color: '#888' },
 
-  // Shop Cards
-  shopGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, justifyContent: 'space-between' },
-  shopWrapper: { width: '48%', marginBottom: 15 },
-  card: {
-    backgroundColor: '#FFF', borderRadius: 16, overflow: 'hidden',
-    elevation: 3, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 5,
-  },
-  cardImageContainer: { height: 110, width: '100%', position: 'relative' },
-  cardImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  ratingBadge: {
-    position: 'absolute', top: 8, right: 8, backgroundColor: '#FFF',
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8,
-  },
-  ratingText: { fontSize: 10, fontWeight: 'bold', marginLeft: 3 },
-  cardContent: { padding: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#333' },
-  cardCategory: { fontSize: 11, color: COLORS.textGray, marginTop: 2 },
-  addButton: {
-    backgroundColor: '#333', width: 28, height: 28, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-  },
-
-  // --- BOTTOM NAV (Glassmorphism) ---
+  // --- BOTTOM NAV ---
   bottomNavContainer: {
-    position: 'absolute', bottom: 20, left: 20, right: 20,
-    height: 70, borderRadius: 35,
-    overflow: 'hidden', // Keeps the blur inside
-    elevation: 10, shadowColor: "#000", shadowOffset: {width: 0, height: 5}, shadowOpacity: 0.2, shadowRadius: 10,
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    height: 80, backgroundColor: '#FFF',
+    borderTopWidth: 1, borderTopColor: '#EEE',
+    paddingBottom: 20 // For iPhone home bar
   },
-  glassBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.glass,
-    opacity: 0.95,
+  glassBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.95)' },
+  navItemsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingTop: 10 },
+  navItem: { alignItems: 'center' },
+  navText: { fontSize: 10, marginTop: 4, color: '#888', fontWeight: '500' },
+  navBadge: {
+    position: 'absolute', top: -4, right: -6, backgroundColor: '#FF4081',
+    width: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#FFF'
   },
-  navItemsRow: {
-    flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 15
-  },
-  navItem: { alignItems: 'center', flex: 1 },
-  navItemCart: { alignItems: 'center', flex: 1, top: -15 }, // Floating cart
-  navText: { fontSize: 10, marginTop: 4, color: COLORS.secondary, fontWeight: '500' },
-  cartCircle: {
-    width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.primary,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 4, borderColor: '#FFF9F2', // Matches bg to look floating
-    elevation: 5, shadowColor: COLORS.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.4, shadowRadius: 5
-  }
+  navBadgeText: { color: '#FFF', fontSize: 9, fontWeight: 'bold' }
 });
