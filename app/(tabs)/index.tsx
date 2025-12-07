@@ -10,8 +10,8 @@ import {
   FlatList,
   Dimensions,
   StatusBar,
-  Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform // Added to fix the Web crash
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ import { initializeApp } from 'firebase/app';
 import { 
   initializeAuth, 
   getReactNativePersistence,
+  getAuth,
   onAuthStateChanged, 
 } from 'firebase/auth';
 import { 
@@ -31,27 +32,33 @@ import {
   onSnapshot 
 } from 'firebase/firestore';
 
-// --- CONFIGURATION ---
+// --- ⚠️ PASTE YOUR FIREBASE CONFIG HERE DIRECTLY ⚠️ ---
+// (Environment variables can be tricky in Expo sometimes, let's hardcode to test)
 const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_API_KEY, 
+  apiKey: "AIzaSy...", // <--- PASTE YOUR REAL API KEY HERE
   authDomain: "shoxa-app.firebaseapp.com",
   projectId: "shoxa-app",
   storageBucket: "shoxa-app.appspot.com",
-  messagingSenderId: "YOUR_ID",
+  messagingSenderId: "YOUR_SENDER_ID",
   appId: "YOUR_APP_ID"
 };
 
-// --- INITIALIZATION (Fixing the Auth Warning) ---
+// --- INITIALIZATION (Fixed for Web & Mobile) ---
 let db, auth;
 try {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
-  // FIX: This enables Auth persistence on React Native
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-  });
+
+  // FIX: Check if we are on Web or Native to avoid the crash
+  if (Platform.OS === 'web') {
+    auth = getAuth(app); // Standard Web Auth
+  } else {
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+    });
+  }
 } catch (e) {
-  console.log("Firebase Init Error (Check Config):", e);
+  console.log("Firebase Init Error:", e);
 }
 
 // --- THEME ---
@@ -59,15 +66,10 @@ const COLORS = {
   bg: '#FFF9F2',        // Cream Background
   primary: '#E86A33',   // Autumn Orange
   secondary: '#2D2D2D', // Dark Text
-  cardBg: '#FFFFFF',
   textGray: '#888888',
-  promoOrange: '#FFCCBC',
-  promoText: '#BF360C'
 };
 
-const { width } = Dimensions.get('window');
-
-// --- DUMMY DATA FOR UI ---
+// --- DUMMY DATA ---
 const PROMOTIONS = [
   { id: '1', title: '50% OFF', subtitle: 'On Plov Center', color: '#FFE0B2' },
   { id: '2', title: 'Free Delivery', subtitle: 'Orders > 100k', color: '#C8E6C9' },
@@ -89,25 +91,22 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
-  // --- DATA FETCHING ---
   useEffect(() => {
     if (!auth || !db) return;
 
-    // Auth Listener
+    // 1. Auth Listener
     const unsubAuth = onAuthStateChanged(auth, (u) => setUser(u));
 
-    // Shops Listener
-    // Note: Ensure your Firestore collection is named exactly 'artifacts/YOUR_APP_ID/public/data/shops' 
-    // based on previous context, or adjust this path.
-    const shopsRef = collection(db, 'artifacts', process.env.EXPO_PUBLIC_APP_ID || 'shoxa_app', 'public', 'data', 'shops');
+    // 2. Shops Listener
+    // MAKE SURE 'artifacts/...' MATCHES YOUR DATABASE PATH EXACTLY
+    const shopsRef = collection(db, 'artifacts', firebaseConfig.appId || 'shoxa_app', 'public', 'data', 'shops');
     
     const unsubShops = onSnapshot(query(shopsRef), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setShops(data);
       setLoading(false);
     }, (error) => {
-      console.log("Firestore Error:", error.message);
-      // Fallback for UI if permission denied
+      console.log("Firestore Error (Check Permissions):", error.message);
       setLoading(false);
     });
 
@@ -117,8 +116,8 @@ export default function HomeScreen() {
   // --- FILTERING ---
   const filteredShops = useMemo(() => {
     let result = shops;
-    
-    // Fallback dummy data if Firestore is empty/error
+
+    // Fallback Dummy Data (Only shows if Firestore returns 0 items)
     if (result.length === 0 && !loading) {
        result = [
          { id: '1', name_uz: 'Korzinka', type: 'Shop', rating: 4.8, image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1000' },
@@ -127,17 +126,22 @@ export default function HomeScreen() {
        ];
     }
 
-    // Category Filter
     const selectedType = CATEGORIES.find(c => c.id === activeCategory)?.type;
     if (selectedType && selectedType !== 'all') {
       result = result.filter(s => s.type === selectedType);
     }
+    
+    if (searchQuery) {
+      result = result.filter(s => 
+        (s.name_uz && s.name_uz.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (s.type && s.type.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
 
     return result;
-  }, [shops, activeCategory, loading]);
+  }, [shops, activeCategory, loading, searchQuery]);
 
-  // --- COMPONENTS ---
-
+  // --- SUB-COMPONENTS ---
   const PromotionCard = ({ item }) => (
     <TouchableOpacity style={[styles.promoCard, { backgroundColor: item.color }]}>
       <View>
@@ -151,20 +155,10 @@ export default function HomeScreen() {
   const CategoryPill = ({ item, isActive, onPress }) => (
     <TouchableOpacity 
       onPress={onPress} 
-      style={[
-        styles.categoryPill, 
-        isActive ? styles.categoryPillActive : styles.categoryPillInactive
-      ]}
+      style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
     >
-      <Ionicons 
-        name={item.icon} 
-        size={18} 
-        color={isActive ? '#FFF' : COLORS.secondary} 
-      />
-      <Text style={[
-        styles.categoryText, 
-        isActive ? { color: '#FFF' } : { color: COLORS.secondary }
-      ]}>
+      <Ionicons name={item.icon} size={18} color={isActive ? '#FFF' : COLORS.secondary} />
+      <Text style={[styles.categoryText, isActive ? { color: '#FFF' } : { color: COLORS.secondary }]}>
         {item.name}
       </Text>
     </TouchableOpacity>
@@ -182,7 +176,6 @@ export default function HomeScreen() {
           <Text style={styles.ratingText}>{item.rating || 'New'}</Text>
         </View>
       </View>
-      
       <View style={styles.cardContent}>
         <View style={{flex: 1}}>
             <Text style={styles.cardTitle} numberOfLines={1}>{item.name_uz || item.name_en || 'Shop Name'}</Text>
@@ -210,7 +203,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* SEARCH BAR */}
+      {/* SEARCH */}
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
           <Ionicons name="search" size={20} color={COLORS.textGray} />
@@ -244,7 +237,7 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* 1. PROMOTIONS (New, Compact, Rectangular) */}
+        {/* 1. PROMOTIONS (The Rectangle Ones you wanted) */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>Promotions</Text>
           <FlatList 
@@ -257,14 +250,10 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* 2. CATEGORIES (Pill Style, Below Promotions) */}
+        {/* 2. CATEGORIES (The Pill Ones) */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>Categories</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20 }}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
             {CATEGORIES.map((cat) => (
               <CategoryPill 
                 key={cat.id} 
@@ -276,7 +265,7 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* 3. RECOMMENDED SHOPS (Grid view to see 2-3 shops easily) */}
+        {/* 3. RECOMMENDED SHOPS (Grid) */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionHeader}>Recommended</Text>
@@ -341,21 +330,19 @@ const styles = StyleSheet.create({
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 },
   seeAllText: { color: COLORS.primary, fontWeight: '600', fontSize: 14 },
 
-  // Promotions (The New Part)
+  // Promotions (Small Rectangles)
   promoCard: {
-    width: 130, height: 65, // Low profile rectangle
-    borderRadius: 12, padding: 10, marginRight: 12, justifyContent: 'center',
+    width: 130, height: 65, borderRadius: 12, padding: 10, marginRight: 12, justifyContent: 'center',
     elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3,
   },
   promoTitle: { fontSize: 14, fontWeight: 'bold', color: '#3E2723' },
   promoSubtitle: { fontSize: 10, color: '#5D4037' },
 
-  // Categories (Pill Style)
+  // Categories (Pills)
   categoryPill: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 8, paddingHorizontal: 16,
-    borderRadius: 20, marginRight: 10,
-    backgroundColor: '#FFF', borderWidth: 1, borderColor: 'transparent',
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16,
+    borderRadius: 20, marginRight: 10, backgroundColor: '#FFF',
+    borderWidth: 1, borderColor: 'transparent',
     elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3,
   },
   categoryPillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
