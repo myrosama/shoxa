@@ -1,112 +1,188 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { 
+  StyleSheet, 
+  Text, 
+  View, 
+  TextInput, 
+  TouchableOpacity, 
+  ScrollView,
+  Alert 
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+const COLORS = {
+  background: '#FAF3E9',
+  primary: '#DC6515',
+  dark: '#4E3320',
+  white: '#FFFFFF',
+  inputBg: '#F5F5F5',
+};
 
-export default function TabTwoScreen() {
+export default function ExploreScreen() {
+  const [shopName, setShopName] = useState('');
+  const [description, setDescription] = useState('');
+  const [address, setAddress] = useState('');
+
+  const handleSubmit = () => {
+    // Here we will eventually connect to Firebase to push this data
+    console.log("Adding Shop:", { shopName, description, address });
+    Alert.alert("Success", "Shop has been submitted for review!");
+    setShopName('');
+    setDescription('');
+    setAddress('');
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        
+        <Text style={styles.headerTitle}>Admin Panel</Text>
+        <Text style={styles.subTitle}>Register a new shop or hospital</Text>
+
+        <View style={styles.formContainer}>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Business Name</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="e.g. Makro Supermarket"
+              value={shopName}
+              onChangeText={setShopName}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Description</Text>
+            <TextInput 
+              style={[styles.input, styles.textArea]} 
+              placeholder="What do they sell?"
+              multiline
+              numberOfLines={4}
+              value={description}
+              onChangeText={setDescription}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Location/Address</Text>
+            <View style={styles.locationInputWrapper}>
+              <Ionicons name="location-outline" size={20} color={COLORS.dark} style={{ marginRight: 10 }} />
+              <TextInput 
+                style={{ flex: 1, height: '100%' }}
+                placeholder="Select on map or type address"
+                value={address}
+                onChangeText={setAddress}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+            <Text style={styles.submitBtnText}>Register Business</Text>
+            <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+
+        </View>
+
+        <View style={styles.infoBox}>
+          <Ionicons name="information-circle-outline" size={24} color={COLORS.primary} />
+          <Text style={styles.infoText}>
+            This data will be uploaded to the SHOXA database. Ensure coordinates are accurate for the map view.
+          </Text>
+        </View>
+
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  titleContainer: {
+  scrollContent: {
+    padding: 20,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: COLORS.dark,
+    marginTop: 10,
+  },
+  subTitle: {
+    fontSize: 16,
+    color: '#888',
+    marginBottom: 30,
+  },
+  formContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.dark,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: COLORS.inputBg,
+    padding: 15,
+    borderRadius: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  locationInputWrapper: {
+    backgroundColor: COLORS.inputBg,
+    height: 50,
+    borderRadius: 12,
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  submitBtn: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 15,
+    marginTop: 10,
+  },
+  submitBtnText: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginRight: 10,
+  },
+  infoBox: {
+    marginTop: 30,
+    flexDirection: 'row',
+    padding: 15,
+    backgroundColor: 'rgba(220, 101, 21, 0.1)',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  infoText: {
+    marginLeft: 10,
+    color: COLORS.dark,
+    flex: 1,
+    fontSize: 13,
   },
 });
