@@ -1,98 +1,204 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { StyleSheet, View, Text, TextInput, FlatList, Dimensions, Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack } from 'expo-router';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+// Import our custom components and styles
+import { MapView, Marker, PROVIDER_GOOGLE } from '../../components/LocationMap'; // Use the web-safe import we made earlier
+import { ShopCard } from '../../components/ShopCard';
+import { COLORS, AUTUMN_MAP_STYLE } from '../../constants/MapTheme';
+
+const { width, height } = Dimensions.get('window');
+
+// Data
+const SHOPS = [
+  { id: '1', name: 'The Rustic Basket', type: 'Grocery', distance: '0.8 km', status: 'Open', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=200' },
+  { id: '2', name: 'Autumn Reads', type: 'Bookstore', distance: '1.2 km', status: 'Closed', image: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?q=80&w=200' },
+  { id: '3', name: 'Harvest Coffee', type: 'Cafe', distance: '0.3 km', status: 'Open', image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=200' },
+  { id: '4', name: 'Golden Pharmacy', type: 'Medicine', distance: '1.5 km', status: 'Open', image: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?q=80&w=200' },
+  { id: '5', name: 'Tashkent Airport', type: 'Travel', distance: '4.2 km', status: 'Open', image: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=200' },
+];
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const mapRef = useRef<any>(null);
+  const sheetRef = useRef<BottomSheet>(null);
+  
+  // 1. Snap Points: 
+  // '15%' = Just search bar (Map is full focus)
+  // '40%' = Map + List split
+  // '95%' = Full List (Map hidden behind)
+  const snapPoints = useMemo(() => ['15%', '40%', '95%'], []);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  // 2. Force 3D Camera on Load
+  useEffect(() => {
+    if (mapRef.current && Platform.OS !== 'web') {
+      mapRef.current.animateCamera({
+        center: { latitude: 41.2995, longitude: 69.2401 },
+        pitch: 45, // 45 degree angle for 3D buildings
+        heading: 0,
+        altitude: 1000,
+        zoom: 16,
+      }, { duration: 2000 });
+    }
+  }, []);
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* A. 3D MAP LAYER */}
+      <View style={StyleSheet.absoluteFillObject}>
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFillObject}
+          provider={PROVIDER_GOOGLE}
+          customMapStyle={AUTUMN_MAP_STYLE} // Our custom JSON
+          showsUserLocation={true}
+          showsMyLocationButton={false} // Hide default button
+          showsCompass={false}          // Hide default button
+          showsBuildings={true}         // Enable 3D buildings
+          pitchEnabled={true}
+          initialRegion={{
+            latitude: 41.2995,
+            longitude: 69.2401,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }}
+        >
+          {/* Custom Marker */}
+          <Marker 
+            coordinate={{ latitude: 41.2995, longitude: 69.2401 }} 
+            pinColor={COLORS.primary}
+          />
+        </MapView>
+
+        {/* Floating "Current Location" Button (Custom) */}
+        <View style={styles.fabContainer}>
+          <View style={styles.fab}>
+            <Ionicons name="navigate" size={24} color={COLORS.primary} />
+          </View>
+        </View>
+      </View>
+
+      {/* B. INTERACTIVE PANEL */}
+      <BottomSheet
+        ref={sheetRef}
+        index={1} // Start at 40%
+        snapPoints={snapPoints}
+        backgroundStyle={styles.sheetBackground}
+        handleIndicatorStyle={styles.sheetHandle}
+      >
+        <View style={styles.sheetContent}>
+          
+          {/* Floating Search Bar Look */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={20} color={COLORS.textSub} />
+              <TextInput 
+                placeholder="What are you looking for?" 
+                placeholderTextColor={COLORS.textSub}
+                style={styles.searchInput}
+              />
+              <View style={styles.filterBtn}>
+                <Ionicons name="options-outline" size={20} color={COLORS.primary} />
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Nearby in Tashkent</Text>
+
+          {/* Scrollable List */}
+          <BottomSheetScrollView 
+            contentContainerStyle={{ paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {SHOPS.map((item) => (
+              <ShopCard key={item.id} item={item} />
+            ))}
+            <View style={{ height: 50 }} />
+          </BottomSheetScrollView>
+        </View>
+      </BottomSheet>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  sheetBackground: {
+    backgroundColor: COLORS.bg,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+  },
+  sheetHandle: {
+    backgroundColor: '#DDD',
+    width: 60,
+  },
+  sheetContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  searchContainer: {
+    marginBottom: 20,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    // Neumorphic style shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  searchInput: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.textMain,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  filterBtn: {
+    padding: 4,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.textMain,
+    marginBottom: 16,
+    letterSpacing: -0.5,
+  },
+  // Floating Map Button
+  fabContainer: {
     position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 1, // Below the bottom sheet but above map
   },
+  fab: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
+  }
 });
