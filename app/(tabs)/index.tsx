@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -8,10 +8,13 @@ import {
   Image, 
   TouchableOpacity, 
   FlatList,
-  Dimensions
+  Dimensions,
+  Animated,
+  Platform,
+  StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 // --- THEME COLORS ---
 const COLORS = {
@@ -21,6 +24,7 @@ const COLORS = {
   white: '#FFFFFF',
   gray: '#B0B0B0',
   lightGray: '#F0F0F0',
+  headerShadow: 'rgba(0,0,0,0.1)'
 };
 
 const { width } = Dimensions.get('window');
@@ -28,7 +32,55 @@ const { width } = Dimensions.get('window');
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Dummy Data for Categories
+  // --- ANIMATION REFS ---
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerTranslateY = useRef(new Animated.Value(-150)).current; // Start hidden above screen
+  const lastScrollY = useRef(0);
+  const isHeaderVisible = useRef(false);
+
+  // --- SCROLL HANDLER (The "Smart" Logic) ---
+  const handleScroll = (event) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const dy = currentY - lastScrollY.current;
+
+    // 1. If we are at the very top (y < 80), always hide the floating header (because the real one is visible)
+    if (currentY < 80) {
+      if (isHeaderVisible.current) {
+        Animated.timing(headerTranslateY, {
+          toValue: -150,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+        isHeaderVisible.current = false;
+      }
+    } 
+    // 2. If scrolling DOWN (dy > 0), hide the floating header
+    else if (dy > 0) {
+      if (isHeaderVisible.current) {
+        Animated.timing(headerTranslateY, {
+          toValue: -150,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+        isHeaderVisible.current = false;
+      }
+    } 
+    // 3. If scrolling UP (dy < -5) and we are deep in the page, show the floating header
+    else if (dy < -5) {
+      if (!isHeaderVisible.current) {
+        Animated.timing(headerTranslateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+        isHeaderVisible.current = true;
+      }
+    }
+
+    lastScrollY.current = currentY;
+  };
+
+  // --- DUMMY DATA ---
   const categories = [
     { id: '1', name: 'All', icon: 'grid-outline' },
     { id: '2', name: 'Shops', icon: 'cart-outline' },
@@ -37,7 +89,6 @@ export default function HomeScreen() {
     { id: '5', name: 'Airports', icon: 'airplane-outline' },
   ];
 
-  // Dummy Data for Recommendations (Replace with Firebase data later)
   const places = [
     {
       id: '1',
@@ -101,86 +152,112 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Good Morning,</Text>
-            <Text style={styles.appName}>Welcome to SHOXA</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      
+      {/* --- 1. FLOATING STICKY HEADER (Hidden initially) --- */}
+      <Animated.View style={[styles.floatingHeader, { transform: [{ translateY: headerTranslateY }] }]}>
+        <SafeAreaView edges={['top']} style={styles.floatingSafeArea}>
+          <View style={styles.floatingContent}>
+             <View style={styles.searchContainerSmall}>
+               <Ionicons name="search" size={20} color={COLORS.gray} style={{ marginLeft: 10 }} />
+               <TextInput 
+                 placeholder="Search stores..." 
+                 style={styles.inputSmall}
+                 value={searchQuery}
+                 onChangeText={setSearchQuery}
+               />
+             </View>
+             <TouchableOpacity style={styles.filterBtnSmall}>
+               <Ionicons name="options" size={20} color={COLORS.white} />
+             </TouchableOpacity>
           </View>
-          <Image 
-            // Using a placeholder avatar or your logo here
-            source={{ uri: 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }} 
-            style={styles.profileImage} 
-          />
-        </View>
+        </SafeAreaView>
+      </Animated.View>
 
-        {/* SEARCH BAR */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={COLORS.gray} style={styles.searchIcon} />
-          <TextInput 
-            placeholder="Search stores, items, or hospitals..." 
-            style={styles.input}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          <TouchableOpacity style={styles.filterBtn}>
-            <Ionicons name="options" size={20} color={COLORS.white} />
-          </TouchableOpacity>
-        </View>
+      {/* --- 2. MAIN SCROLL VIEW --- */}
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        onScroll={handleScroll}
+        scrollEventThrottle={16} // smooth animation
+      >
+        <SafeAreaView edges={['top']} style={{ paddingHorizontal: 20 }}>
+          
+          {/* ORIGINAL HEADER */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.greeting}>Good Morning,</Text>
+              <Text style={styles.appName}>Welcome to SHOXA</Text>
+            </View>
+            <Image 
+              source={{ uri: 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }} 
+              style={styles.profileImage} 
+            />
+          </View>
 
-        {/* MAP BANNER (Autumn Vibe) */}
-        <View style={styles.bannerContainer}>
-          <View style={styles.bannerTextContainer}>
-            <Text style={styles.bannerTitle}>Explore Nearby</Text>
-            <Text style={styles.bannerSubtitle}>Find the best spots in Tashkent</Text>
-            <TouchableOpacity style={styles.bannerBtn}>
-              <Text style={styles.bannerBtnText}>Open Map</Text>
+          {/* ORIGINAL SEARCH BAR */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color={COLORS.gray} style={styles.searchIcon} />
+            <TextInput 
+              placeholder="Search stores, items, or hospitals..." 
+              style={styles.input}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            <TouchableOpacity style={styles.filterBtn}>
+              <Ionicons name="options" size={20} color={COLORS.white} />
             </TouchableOpacity>
           </View>
-          <Image 
-            // Placeholder for the Map Image - replace with your local asset later
-            source={{ uri: 'https://img.freepik.com/free-vector/map-navigation-concept_23-2147983944.jpg' }} 
-            style={styles.bannerImage} 
-          />
-        </View>
 
-        {/* CATEGORIES */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-        </View>
-        <FlatList
-          horizontal
-          data={categories}
-          renderItem={renderCategory}
-          keyExtractor={item => item.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        />
-
-        {/* RECOMMENDATIONS GRID */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recommended for you</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeAllText}>See all</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.gridContainer}>
-          {places.map((place) => (
-            <View key={place.id} style={styles.gridWrapper}>
-              {renderPlace({ item: place })}
+          {/* MAP BANNER */}
+          <View style={styles.bannerContainer}>
+            <View style={styles.bannerTextContainer}>
+              <Text style={styles.bannerTitle}>Explore Nearby</Text>
+              <Text style={styles.bannerSubtitle}>Find the best spots in Tashkent</Text>
+              <TouchableOpacity style={styles.bannerBtn}>
+                <Text style={styles.bannerBtnText}>Open Map</Text>
+              </TouchableOpacity>
             </View>
-          ))}
-        </View>
+            <Image 
+              source={{ uri: 'https://img.freepik.com/free-vector/map-navigation-concept_23-2147983944.jpg' }} 
+              style={styles.bannerImage} 
+            />
+          </View>
 
-        {/* BOTTOM SPACING */}
-        <View style={{ height: 100 }} />
+          {/* CATEGORIES */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Categories</Text>
+          </View>
+          <FlatList
+            horizontal
+            data={categories}
+            renderItem={renderCategory}
+            keyExtractor={item => item.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesList}
+          />
 
+          {/* RECOMMENDATIONS GRID */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recommended for you</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.gridContainer}>
+            {places.map((place) => (
+              <View key={place.id} style={styles.gridWrapper}>
+                {renderPlace({ item: place })}
+              </View>
+            ))}
+          </View>
+
+          <View style={{ height: 40 }} />
+        </SafeAreaView>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -188,8 +265,56 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 20,
   },
+  
+  // --- FLOATING HEADER STYLES ---
+  floatingHeader: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    backgroundColor: COLORS.background,
+    zIndex: 100,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  floatingSafeArea: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    paddingTop: Platform.OS === 'android' ? 35 : 0, // Manual adjustment if SafeArea doesn't catch status bar
+  },
+  floatingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchContainerSmall: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    height: 45,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+  },
+  inputSmall: {
+    flex: 1,
+    height: '100%',
+    paddingLeft: 10,
+    color: COLORS.dark,
+  },
+  filterBtnSmall: {
+    backgroundColor: COLORS.primary,
+    height: 45,
+    width: 45,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+
+  // --- ORIGINAL STYLES ---
   header: {
     marginTop: 20,
     flexDirection: 'row',
@@ -230,8 +355,8 @@ const styles = StyleSheet.create({
     paddingLeft: 45,
     fontSize: 16,
     color: COLORS.dark,
-    elevation: 2, // Shadow for Android
-    shadowColor: '#000', // Shadow for iOS
+    elevation: 2, 
+    shadowColor: '#000', 
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -247,7 +372,7 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     height: 150,
-    backgroundColor: '#FCEAC6', // Lighter autumn tone
+    backgroundColor: '#FCEAC6', 
     borderRadius: 20,
     flexDirection: 'row',
     overflow: 'hidden',
@@ -333,7 +458,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   gridWrapper: {
-    width: '48%', // 2 columns
+    width: '48%', 
     marginBottom: 15,
   },
   card: {
