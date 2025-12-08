@@ -48,7 +48,8 @@ export default function HomeScreen() {
 
   // Scroll direction tracking for reveal-on-scroll-up
   const lastScrollY = useRef(0);
-  const [showRevealHeader, setShowRevealHeader] = useState(false);
+  const [revealHeaderVisible, setRevealHeaderVisible] = useState(false);
+  const [revealHeaderMounted, setRevealHeaderMounted] = useState(false);
   const revealHeaderTranslateY = useRef(new Animated.Value(-250)).current;
 
   useEffect(() => {
@@ -65,13 +66,32 @@ export default function HomeScreen() {
     setDirectionModalShop(shop);
   };
 
-  // Animate reveal header - smooth slide from top
-  const animateRevealHeader = (show: boolean) => {
+  // Show reveal header with animation
+  const showRevealHeaderAnimated = () => {
+    if (!revealHeaderMounted) {
+      setRevealHeaderMounted(true);
+      revealHeaderTranslateY.setValue(-250); // Reset position
+    }
+    setRevealHeaderVisible(true);
     Animated.timing(revealHeaderTranslateY, {
-      toValue: show ? 0 : -250,
-      duration: 300,
+      toValue: 0,
+      duration: 280,
       useNativeDriver: true,
     }).start();
+  };
+
+  // Hide reveal header with animation
+  const hideRevealHeaderAnimated = () => {
+    if (!revealHeaderVisible) return;
+    setRevealHeaderVisible(false);
+    Animated.timing(revealHeaderTranslateY, {
+      toValue: -250,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      // Unmount after animation completes
+      setRevealHeaderMounted(false);
+    });
   };
 
   // Handle scroll events
@@ -90,21 +110,18 @@ export default function HomeScreen() {
         // 3. Scroll delta is significant enough (> 5px to avoid jitter)
         if (offsetY > SEARCH_THRESHOLD) {
           if (isScrollingUp && scrollDelta > 5) {
-            if (!showRevealHeader) {
-              setShowRevealHeader(true);
-              animateRevealHeader(true);
+            if (!revealHeaderVisible) {
+              showRevealHeaderAnimated();
             }
           } else if (!isScrollingUp && scrollDelta > 10) {
-            if (showRevealHeader) {
-              setShowRevealHeader(false);
-              animateRevealHeader(false);
+            if (revealHeaderVisible) {
+              hideRevealHeaderAnimated();
             }
           }
         } else {
           // Hide reveal header when scrolled back up to search bar area
-          if (showRevealHeader) {
-            setShowRevealHeader(false);
-            animateRevealHeader(false);
+          if (revealHeaderVisible) {
+            hideRevealHeaderAnimated();
           }
         }
 
@@ -167,7 +184,7 @@ export default function HomeScreen() {
       </View>
 
       {/* --- REVEAL-ON-SCROLL-UP HEADER (Search + Categories) --- */}
-      {showRevealHeader && (
+      {revealHeaderMounted && (
         <Animated.View style={[
           styles.revealHeader,
           {
