@@ -177,9 +177,7 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>Good Morning,</Text>
             <Text style={styles.appName}>Welcome to SHOXA</Text>
           </View>
-          <View style={styles.logoWrapper}>
-            <Image source={require('@/assets/logo.png')} style={styles.logo} resizeMode="contain" />
-          </View>
+          <Image source={require('@/assets/logo.png')} style={styles.logo} resizeMode="contain" />
         </Animated.View>
       </View>
 
@@ -404,8 +402,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
   greeting: { fontSize: 14, color: COLORS.secondary, marginBottom: 2 },
   appName: { fontSize: 26, fontWeight: '800', color: '#5D4037' },
-  logoWrapper: { width: 50, height: 50, backgroundColor: COLORS.white, borderRadius: 25, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, elevation: 2 },
-  logo: { width: 30, height: 30 },
+  logo: { width: 80, height: 80 },
 
   // LAYER 2: Location Bar (Scrollable)
   locationBarWrapper: {
