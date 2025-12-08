@@ -99,24 +99,24 @@ export default function HomeScreen() {
     }
   );
 
-  // CYLINDER ROLL for location bar
-  // Positive rotation = top of element goes backward (rolls over forward like paper on cylinder)
-  // Also moves UP (translateY negative) to cover the welcome text
-  const locationBarRotation = scrollY.interpolate({
-    inputRange: [0, LOCATION_STICKY_SCROLL * 0.5, LOCATION_STICKY_SCROLL],
-    outputRange: ['0deg', '45deg', '90deg'], // POSITIVE = rolls forward (top goes back)
+  // LAYER 2 MOVEMENT - Entire layer moves UP as user scrolls
+  // This brings content up to cover welcome text BEFORE roll happens
+  const layer2TranslateY = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: [0, -80], // Move up 80px (covers welcome text)
     extrapolate: 'clamp',
   });
 
-  // Move UP as it rolls (cylinder moving upward)
-  const locationBarTranslateY = scrollY.interpolate({
-    inputRange: [0, LOCATION_STICKY_SCROLL],
-    outputRange: [0, -50], // Moves UP 50px
+  // CYLINDER ROLL for location bar
+  // Positive rotation = top of element goes backward (rolls over forward like paper on cylinder)
+  const locationBarRotation = scrollY.interpolate({
+    inputRange: [60, 80, 100], // Starts rolling AFTER layer moves up
+    outputRange: ['0deg', '45deg', '90deg'],
     extrapolate: 'clamp',
   });
 
   const locationBarOpacity = scrollY.interpolate({
-    inputRange: [0, LOCATION_STICKY_SCROLL * 0.6, LOCATION_STICKY_SCROLL],
+    inputRange: [60, 90, 100],
     outputRange: [1, 0.4, 0],
     extrapolate: 'clamp',
   });
@@ -131,13 +131,13 @@ export default function HomeScreen() {
   // Categories - CYLINDER ROLL (top goes back)
   const categoriesRotation = scrollY.interpolate({
     inputRange: [CATEGORY_STICKY_SCROLL - 60, CATEGORY_STICKY_SCROLL - 20, CATEGORY_STICKY_SCROLL],
-    outputRange: ['0deg', '45deg', '90deg'], // POSITIVE = rolls forward
+    outputRange: ['0deg', '45deg', '90deg'],
     extrapolate: 'clamp',
   });
 
   const categoriesTranslateY = scrollY.interpolate({
     inputRange: [CATEGORY_STICKY_SCROLL - 60, CATEGORY_STICKY_SCROLL],
-    outputRange: [0, -40], // Moves UP
+    outputRange: [0, -40],
     extrapolate: 'clamp',
   });
 
@@ -200,7 +200,10 @@ export default function HomeScreen() {
 
       {/* --- LAYER 2: SCROLLABLE CONTENT --- */}
       <Animated.ScrollView
-        style={{ marginTop: insets.top + 80 }}
+        style={{
+          marginTop: insets.top + 80,
+          transform: [{ translateY: layer2TranslateY }]
+        }}
         contentContainerStyle={{
           paddingBottom: 120,
         }}
@@ -216,7 +219,6 @@ export default function HomeScreen() {
             opacity: locationBarOpacity,
             transform: [
               { perspective: 1000 },
-              { translateY: locationBarTranslateY },
               { rotateX: locationBarRotation },
             ]
           }
