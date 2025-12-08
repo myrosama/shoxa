@@ -202,10 +202,21 @@ export default function HomeScreen() {
       <Animated.ScrollView
         style={{
           marginTop: insets.top + 80,
-          transform: [{ translateY: layer2TranslateY }]
+          transform: [{ translateY: layer2TranslateY }],
+          backgroundColor: '#FFFFFF', // Solid white background for Layer 2
+          borderTopLeftRadius: 25,
+          borderTopRightRadius: 25,
+          // Top shadow to make roll-over visible
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
+          elevation: 10,
         }}
         contentContainerStyle={{
           paddingBottom: 120,
+          paddingTop: 15,
+          backgroundColor: '#FFFFFF',
         }}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
@@ -383,14 +394,11 @@ const styles = StyleSheet.create({
   // LAYER 2: Location Bar (Scrollable)
   locationBarWrapper: {
     paddingHorizontal: 20,
-    marginTop: 10,
     marginBottom: 10,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF', // Match Layer 2 background
   },
   locationBarBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.background,
-    opacity: 0.98,
+    display: 'none', // No longer needed
   },
   locationBar: {
     flexDirection: 'row', alignItems: 'center',
@@ -433,7 +441,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 10,
     paddingTop: 5,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF', // Match Layer 2 background
   },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
