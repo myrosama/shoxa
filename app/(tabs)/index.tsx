@@ -43,13 +43,13 @@ export default function HomeScreen() {
   // Animated scroll value
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Scroll threshold - when user has scrolled past categories
-  const CATEGORY_THRESHOLD = 340;
+  // Scroll threshold - when user has scrolled past search bar
+  const SEARCH_THRESHOLD = 70;
 
   // Scroll direction tracking for reveal-on-scroll-up
   const lastScrollY = useRef(0);
   const [showRevealHeader, setShowRevealHeader] = useState(false);
-  const revealHeaderAnim = useRef(new Animated.Value(-150)).current; // Start hidden above screen
+  const revealHeaderAnim = useRef(new Animated.Value(-200)).current; // Start hidden above screen
 
   useEffect(() => {
     const unsubscribe = onSnapshot(query(collection(db, 'artifacts', 'default-app-id', 'public', 'data', 'shops')), (snapshot) => {
@@ -68,7 +68,7 @@ export default function HomeScreen() {
   // Animate reveal header in/out
   const animateRevealHeader = (show: boolean) => {
     Animated.spring(revealHeaderAnim, {
-      toValue: show ? 0 : -150,
+      toValue: show ? 0 : -200,
       useNativeDriver: true,
       tension: 80,
       friction: 12,
@@ -86,10 +86,10 @@ export default function HomeScreen() {
         const scrollDelta = Math.abs(offsetY - lastScrollY.current);
 
         // Only show reveal header when:
-        // 1. User has scrolled past categories (offsetY > CATEGORY_THRESHOLD)
+        // 1. User has scrolled past search bar (offsetY > SEARCH_THRESHOLD)
         // 2. User is scrolling UP
         // 3. Scroll delta is significant enough (> 5px to avoid jitter)
-        if (offsetY > CATEGORY_THRESHOLD) {
+        if (offsetY > SEARCH_THRESHOLD) {
           if (isScrollingUp && scrollDelta > 5) {
             if (!showRevealHeader) {
               setShowRevealHeader(true);
@@ -102,7 +102,7 @@ export default function HomeScreen() {
             }
           }
         } else {
-          // Hide reveal header when scrolled back up to categories area
+          // Hide reveal header when scrolled back up to search bar area
           if (showRevealHeader) {
             setShowRevealHeader(false);
             animateRevealHeader(false);
@@ -146,16 +146,17 @@ export default function HomeScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
       {/* --- LAYER 1: FIXED BACKGROUND (Welcome + Logo) --- */}
-      <Animated.View style={[
+      {/* Background stays visible always */}
+      <View style={[
         styles.fixedLayer,
         {
           paddingTop: insets.top,
           height: 200,
           backgroundColor: COLORS.layer1Background,
-          opacity: welcomeOpacity,
         }
       ]}>
-        <View style={styles.headerRow}>
+        {/* Only text and logo fade */}
+        <Animated.View style={[styles.headerRow, { opacity: welcomeOpacity }]}>
           <View>
             <Text style={styles.greeting}>Good Morning,</Text>
             <Text style={styles.appName}>Welcome to SHOXA</Text>
@@ -163,8 +164,8 @@ export default function HomeScreen() {
           <View style={styles.logoWrapper}>
             <Image source={require('@/assets/logo.png')} style={styles.logo} resizeMode="contain" />
           </View>
-        </View>
-      </Animated.View>
+        </Animated.View>
+      </View>
 
       {/* --- REVEAL-ON-SCROLL-UP HEADER (Search + Categories) --- */}
       {showRevealHeader && (
@@ -175,12 +176,33 @@ export default function HomeScreen() {
             transform: [{ translateY: revealHeaderAnim }]
           }
         ]}>
+          {/* Rounded top handle for cylinder effect */}
+          <View style={styles.revealHandleContainer}>
+            <View style={styles.revealHandle} />
+          </View>
+
+          {/* Location Bar */}
+          <View style={styles.revealLocationContainer}>
+            <TouchableOpacity style={styles.revealLocationBar}>
+              <View style={styles.locationIconBg}>
+                <Ionicons name="location" size={14} color={COLORS.white} />
+              </View>
+              <Text style={styles.locationText} numberOfLines={1}>
+                Home • Tashkent City, Uzbekistan
+              </Text>
+              <Ionicons name="chevron-down" size={14} color={COLORS.gray} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Search Bar */}
           <View style={styles.revealSearchContainer}>
             <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
               <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
               <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
             </Pressable>
           </View>
+
+          {/* Categories */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
             {CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.id;
@@ -413,16 +435,43 @@ const styles = StyleSheet.create({
     zIndex: 1000,
     elevation: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     paddingBottom: 12,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+  },
+  revealHandleContainer: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 5,
+  },
+  revealHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#D4C4B5',
+    borderRadius: 2,
+  },
+  revealLocationContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  revealLocationBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    elevation: 2,
   },
   revealSearchContainer: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 5,
     paddingBottom: 10,
   },
 

@@ -14,30 +14,34 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: activeColor,
+        tabBarInactiveTintColor: '#9E9E9E',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          position: 'absolute', 
-          bottom: 25, // Lifted up
-          left: 20, 
-          right: 20, // Floating with margins
+          position: 'absolute',
+          bottom: 25,
+          left: 20,
+          right: 20,
           height: 70,
-          borderRadius: 35, // Fully rounded ends
-          paddingBottom: 0, // Centered icons
+          borderRadius: 35,
+          paddingBottom: 0,
           paddingTop: 0,
           borderTopWidth: 0,
-          elevation: 10,
+          elevation: 15,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: 5 },
+          shadowOffset: { width: 0, height: 8 },
           shadowOpacity: 0.15,
-          shadowRadius: 10,
+          shadowRadius: 12,
           backgroundColor: '#ffffff',
-          alignItems: 'center',
-          justifyContent: 'center',
         },
-        tabBarShowLabel: false, // Cleaner look without labels (optional, based on photo)
+        tabBarShowLabel: false,
+        tabBarItemStyle: {
+          height: 70,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
       }}>
-      
+
       <Tabs.Screen
         name="index"
         options={{
@@ -55,12 +59,20 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={{
-              width: 60, height: 60, borderRadius: 30, 
-              backgroundColor: '#C67C43', 
-              justifyContent: 'center', alignItems: 'center',
-              marginBottom: 40, // Pop out effect
-              shadowColor: '#C67C43', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, elevation: 8,
-              borderWidth: 4, borderColor: '#FDF6E3' // Ring effect
+              width: 60,
+              height: 60,
+              borderRadius: 30,
+              backgroundColor: '#C67C43',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginTop: -30, // Pop out effect - lift it up
+              shadowColor: '#C67C43',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.4,
+              shadowRadius: 8,
+              elevation: 10,
+              borderWidth: 4,
+              borderColor: '#FDF6E3'
             }}>
               <Ionicons name="map" size={28} color="white" />
             </View>
