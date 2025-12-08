@@ -42,16 +42,15 @@ export default function HomeScreen() {
   // Animated scroll value
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Animation state
-  const stickySearchOpacity = useRef(new Animated.Value(0)).current;
-  const stickyCategoryOpacity = useRef(new Animated.Value(0)).current;
+  // Animation state - Search is ALWAYS sticky once scroll begins
   const [showStickySearch, setShowStickySearch] = useState(false);
   const [showStickyCategories, setShowStickyCategories] = useState(false);
+  const stickyCategoryOpacity = useRef(new Animated.Value(0)).current;
 
   // Threshold calculations
   const LAYER_1_HEIGHT = insets.top + 70;
-  const SEARCH_POSITION = LAYER_1_HEIGHT + 60; // Location bar height + margin
-  const CATEGORY_POSITION = SEARCH_POSITION + 250; // Search + Banner + Title
+  const LOCATION_BAR_ROLL_END = 40; // Location bar fully rolled over by 40px scroll
+  const CATEGORY_POSITION = 280; // When categories become sticky
 
   useEffect(() => {
     const unsubscribe = onSnapshot(query(collection(db, 'artifacts', 'default-app-id', 'public', 'data', 'shops')), (snapshot) => {
@@ -67,7 +66,7 @@ export default function HomeScreen() {
     setDirectionModalShop(shop);
   };
 
-  // Handle scroll with animations
+  // Handle scroll - Search becomes sticky IMMEDIATELY on any scroll
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     {
@@ -75,34 +74,25 @@ export default function HomeScreen() {
       listener: (event: any) => {
         const offsetY = event.nativeEvent.contentOffset.y;
 
-        // Search sticky trigger
-        if (offsetY > SEARCH_POSITION - 20 && !showStickySearch) {
+        // Search bar becomes sticky immediately on scroll
+        if (offsetY > 5 && !showStickySearch) {
           setShowStickySearch(true);
-          Animated.timing(stickySearchOpacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }).start();
-        } else if (offsetY <= SEARCH_POSITION - 20 && showStickySearch) {
-          Animated.timing(stickySearchOpacity, {
-            toValue: 0,
-            duration: 150,
-            useNativeDriver: true,
-          }).start(() => setShowStickySearch(false));
+        } else if (offsetY <= 5 && showStickySearch) {
+          setShowStickySearch(false);
         }
 
         // Category sticky trigger
-        if (offsetY > CATEGORY_POSITION - 20 && !showStickyCategories) {
+        if (offsetY > CATEGORY_POSITION && !showStickyCategories) {
           setShowStickyCategories(true);
           Animated.timing(stickyCategoryOpacity, {
             toValue: 1,
-            duration: 200,
+            duration: 150,
             useNativeDriver: true,
           }).start();
-        } else if (offsetY <= CATEGORY_POSITION - 20 && showStickyCategories) {
+        } else if (offsetY <= CATEGORY_POSITION && showStickyCategories) {
           Animated.timing(stickyCategoryOpacity, {
             toValue: 0,
-            duration: 150,
+            duration: 100,
             useNativeDriver: true,
           }).start(() => setShowStickyCategories(false));
         }
@@ -110,35 +100,28 @@ export default function HomeScreen() {
     }
   );
 
-  // Cylinder roll animation for location bar
+  // Cylinder roll animation for location bar - FAST roll (0 to 40px scroll)
   const locationBarRotation = scrollY.interpolate({
-    inputRange: [0, SEARCH_POSITION],
+    inputRange: [0, LOCATION_BAR_ROLL_END],
     outputRange: ['0deg', '-90deg'],
     extrapolate: 'clamp',
   });
 
   const locationBarTranslateY = scrollY.interpolate({
-    inputRange: [0, SEARCH_POSITION],
-    outputRange: [0, -30],
+    inputRange: [0, LOCATION_BAR_ROLL_END],
+    outputRange: [0, -40],
     extrapolate: 'clamp',
   });
 
   const locationBarOpacity = scrollY.interpolate({
-    inputRange: [0, SEARCH_POSITION * 0.7, SEARCH_POSITION],
-    outputRange: [1, 0.5, 0],
+    inputRange: [0, LOCATION_BAR_ROLL_END * 0.5, LOCATION_BAR_ROLL_END],
+    outputRange: [1, 0.3, 0],
     extrapolate: 'clamp',
   });
 
-  // In-flow search bar opacity (hidden when sticky appears)
-  const inFlowSearchOpacity = scrollY.interpolate({
-    inputRange: [SEARCH_POSITION - 40, SEARCH_POSITION],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  // In-flow categories opacity
+  // In-flow categories opacity (fades when sticky appears)
   const inFlowCategoryOpacity = scrollY.interpolate({
-    inputRange: [CATEGORY_POSITION - 40, CATEGORY_POSITION],
+    inputRange: [CATEGORY_POSITION - 30, CATEGORY_POSITION],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
@@ -164,7 +147,7 @@ export default function HomeScreen() {
       {showStickySearch && (
         <Animated.View style={[
           styles.fixedStickyHeader,
-          { top: insets.top, opacity: stickySearchOpacity }
+          { top: insets.top }
         ]}>
           <View style={styles.stickySearchContainer}>
             <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
@@ -229,13 +212,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Search Bar (in-flow, fades out when sticky appears) */}
-        <Animated.View style={[styles.searchWrapper, { opacity: inFlowSearchOpacity }]}>
+        {/* Search Bar (in-flow, visible until sticky covers it) */}
+        <View style={styles.searchWrapper}>
           <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
             <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
             <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
           </Pressable>
-        </Animated.View>
+        </View>
 
         {/* Banner */}
         <View style={styles.contentBackground}>
