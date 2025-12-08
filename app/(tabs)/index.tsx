@@ -167,35 +167,37 @@ export default function HomeScreen() {
       </Animated.View>
 
       {/* --- REVEAL-ON-SCROLL-UP HEADER (Search + Categories) --- */}
-      <Animated.View style={[
-        styles.revealHeader,
-        {
-          top: insets.top,
-          transform: [{ translateY: revealHeaderAnim }]
-        }
-      ]}>
-        <View style={styles.revealSearchContainer}>
-          <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
-            <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
-          </Pressable>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
-          {CATEGORIES.map((cat) => {
-            const isActive = activeCategory === cat.id;
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
-                onPress={() => setActiveCategory(cat.id)}
-              >
-                <Ionicons name={cat.icon as any} size={18} color={isActive ? COLORS.white : '#5D4037'} style={{ marginRight: 6 }} />
-                <Text style={[styles.categoryText, isActive ? { color: COLORS.white } : { color: '#5D4037' }]}>{cat.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </Animated.View>
+      {showRevealHeader && (
+        <Animated.View style={[
+          styles.revealHeader,
+          {
+            top: insets.top,
+            transform: [{ translateY: revealHeaderAnim }]
+          }
+        ]}>
+          <View style={styles.revealSearchContainer}>
+            <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
+              <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
+            </Pressable>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
+            {CATEGORIES.map((cat) => {
+              const isActive = activeCategory === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
+                  onPress={() => setActiveCategory(cat.id)}
+                >
+                  <Ionicons name={cat.icon as any} size={18} color={isActive ? COLORS.white : '#5D4037'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.categoryText, isActive ? { color: COLORS.white } : { color: '#5D4037' }]}>{cat.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
+      )}
 
       {/* --- LAYER 2: SCROLLABLE CONTENT --- */}
       <Animated.ScrollView
