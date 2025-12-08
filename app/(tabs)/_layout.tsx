@@ -19,24 +19,24 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
         tabBarStyle: {
           position: 'absolute',
-          bottom: 25,
+          bottom: 20,
           left: 20,
           right: 20,
-          height: 70,
+          height: 65,
           borderRadius: 35,
           paddingBottom: 0,
           paddingTop: 0,
           borderTopWidth: 0,
           elevation: 15,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.15,
-          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.12,
+          shadowRadius: 10,
           backgroundColor: '#ffffff',
         },
         tabBarShowLabel: false,
         tabBarItemStyle: {
-          height: 70,
+          height: 65,
           justifyContent: 'center',
           alignItems: 'center',
         },
@@ -45,13 +45,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ color, focused }) => <Ionicons size={26} name={focused ? "grid" : "grid-outline"} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "grid" : "grid-outline"} color={color} />,
         }}
       />
       <Tabs.Screen
         name="feed"
         options={{
-          tabBarIcon: ({ color, focused }) => <Ionicons size={26} name={focused ? "newspaper" : "newspaper-outline"} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "newspaper" : "newspaper-outline"} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -59,22 +59,23 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={{
-              width: 60,
-              height: 60,
-              borderRadius: 30,
+              width: 56,
+              height: 56,
+              borderRadius: 28,
               backgroundColor: '#C67C43',
               justifyContent: 'center',
               alignItems: 'center',
-              marginTop: -30, // Pop out effect - lift it up
+              position: 'absolute',
+              bottom: 15,
               shadowColor: '#C67C43',
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.4,
+              shadowOpacity: 0.35,
               shadowRadius: 8,
               elevation: 10,
-              borderWidth: 4,
+              borderWidth: 3,
               borderColor: '#FDF6E3'
             }}>
-              <Ionicons name="map" size={28} color="white" />
+              <Ionicons name="map" size={26} color="white" />
             </View>
           ),
         }}
@@ -82,13 +83,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="cart"
         options={{
-          tabBarIcon: ({ color, focused }) => <Ionicons size={26} name={focused ? "cart" : "cart-outline"} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "cart" : "cart-outline"} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ color, focused }) => <Ionicons size={26} name={focused ? "person" : "person-outline"} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "person" : "person-outline"} color={color} />,
         }}
       />
     </Tabs>

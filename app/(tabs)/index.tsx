@@ -49,7 +49,8 @@ export default function HomeScreen() {
   // Scroll direction tracking for reveal-on-scroll-up
   const lastScrollY = useRef(0);
   const [showRevealHeader, setShowRevealHeader] = useState(false);
-  const revealHeaderAnim = useRef(new Animated.Value(-200)).current; // Start hidden above screen
+  const revealHeaderTranslateY = useRef(new Animated.Value(-200)).current;
+  const revealHeaderOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const unsubscribe = onSnapshot(query(collection(db, 'artifacts', 'default-app-id', 'public', 'data', 'shops')), (snapshot) => {
@@ -65,14 +66,21 @@ export default function HomeScreen() {
     setDirectionModalShop(shop);
   };
 
-  // Animate reveal header in/out
+  // Animate reveal header in/out with smooth opacity + slide
   const animateRevealHeader = (show: boolean) => {
-    Animated.spring(revealHeaderAnim, {
-      toValue: show ? 0 : -200,
-      useNativeDriver: true,
-      tension: 80,
-      friction: 12,
-    }).start();
+    Animated.parallel([
+      Animated.spring(revealHeaderTranslateY, {
+        toValue: show ? 0 : -200,
+        useNativeDriver: true,
+        tension: 60,
+        friction: 10,
+      }),
+      Animated.timing(revealHeaderOpacity, {
+        toValue: show ? 1 : 0,
+        duration: show ? 200 : 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   // Handle scroll events
@@ -173,7 +181,8 @@ export default function HomeScreen() {
           styles.revealHeader,
           {
             top: insets.top,
-            transform: [{ translateY: revealHeaderAnim }]
+            opacity: revealHeaderOpacity,
+            transform: [{ translateY: revealHeaderTranslateY }]
           }
         ]}>
           {/* Centered Title */}
