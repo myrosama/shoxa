@@ -21,12 +21,31 @@ const COLORS = {
   yellow: '#FFD700'
 };
 
+// Telegram Bot Token for image URLs
+const TELEGRAM_BOT_TOKEN = '8471215089:AAHyG6JFoh2yn5jzKVmhz_IQrRkG0EpNqCY';
+
+// Helper to get Telegram image URL
+const getTelegramImageUrl = async (fileId: string): Promise<string | null> => {
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`);
+    const data = await response.json();
+    if (data.ok) {
+      return `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${data.result.file_path}`;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting Telegram image URL:', error);
+    return null;
+  }
+};
+
 const CATEGORIES = [
   { id: 'All', label: 'All', icon: 'grid-outline' },
-  { id: 'Shop', label: 'Shops', icon: 'cart-outline' },
-  { id: 'Restaurant', label: 'Food', icon: 'fast-food-outline' },
-  { id: 'Hospital', label: 'Hospital', icon: 'medkit-outline' },
-  { id: 'Service', label: 'Services', icon: 'construct-outline' },
+  { id: 'restaurant', label: 'Food', icon: 'fast-food-outline' },
+  { id: 'pharmacy', label: 'Pharmacy', icon: 'medkit-outline' },
+  { id: 'grocery', label: 'Grocery', icon: 'cart-outline' },
+  { id: 'cafe', label: 'Cafe', icon: 'cafe-outline' },
+  { id: 'bakery', label: 'Bakery', icon: 'pizza-outline' },
 ];
 
 const { width } = Dimensions.get('window');
@@ -53,8 +72,26 @@ export default function HomeScreen() {
   const revealHeaderTranslateY = useRef(new Animated.Value(-250)).current;
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(query(collection(db, 'artifacts', 'default-app-id', 'public', 'data', 'shops')), (snapshot) => {
-      setShops(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // Load shops from the 'shops' collection
+    const unsubscribe = onSnapshot(query(collection(db, 'shops')), async (snapshot) => {
+      const shopsData = await Promise.all(
+        snapshot.docs.map(async (doc) => {
+          const data = doc.data();
+          let logoUrl = null;
+
+          // Get image URL from Telegram if logoFileId exists
+          if (data.logoFileId) {
+            logoUrl = await getTelegramImageUrl(data.logoFileId);
+          }
+
+          return {
+            id: doc.id,
+            ...data,
+            logoUrl: logoUrl
+          };
+        })
+      );
+      setShops(shopsData);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -333,20 +370,23 @@ export default function HomeScreen() {
                   onPress={() => router.push(`/shop/${shop.id}`)}
                   activeOpacity={0.9}
                 >
-                  <Image source={{ uri: shop.profilePicUrl || 'https://via.placeholder.com/150' }} style={styles.cardImage} />
+                  <Image
+                    source={{ uri: shop.logoUrl || 'https://via.placeholder.com/150?text=No+Image' }}
+                    style={styles.cardImage}
+                  />
                   <View style={styles.cardContent}>
                     <View style={styles.cardHeader}>
-                      <Text style={styles.cardTitle} numberOfLines={2}>{shop.name_uz}</Text>
+                      <Text style={styles.cardTitle} numberOfLines={2}>{shop.name || 'Unnamed Shop'}</Text>
                       <View style={styles.ratingContainer}>
                         <Ionicons name="star" size={12} color={COLORS.yellow} />
                         <Text style={styles.ratingText}>{shop.rating || '4.5'}</Text>
                       </View>
                     </View>
-                    <Text style={styles.cardType}>{shop.type}</Text>
+                    <Text style={styles.cardType}>{shop.type || 'Shop'}</Text>
                     <View style={styles.cardFooter}>
                       <View style={styles.locationContainer}>
                         <Ionicons name="location-sharp" size={14} color={COLORS.primary} />
-                        <Text style={styles.distanceText}>1.2 km</Text>
+                        <Text style={styles.distanceText}>{shop.location?.address?.substring(0, 20) || '...'}</Text>
                       </View>
                       <TouchableOpacity
                         style={styles.locationButton}
@@ -368,7 +408,7 @@ export default function HomeScreen() {
       {directionModalShop && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Navigate to {directionModalShop.name_uz}?</Text>
+            <Text style={styles.modalTitle}>Navigate to {directionModalShop.name}?</Text>
             <Text style={styles.modalText}>Estimated time: 15 mins (Driving)</Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#eee' }]} onPress={() => setDirectionModalShop(null)}>

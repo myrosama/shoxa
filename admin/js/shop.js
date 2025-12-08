@@ -139,7 +139,14 @@ const Shop = {
 
     // Save shop data
     async save() {
-        if (!Auth.userData?.shopId) return;
+        console.log('=== SAVE SHOP STARTED ===');
+        console.log('Auth.userData:', Auth.userData);
+
+        if (!Auth.userData?.shopId) {
+            console.error('No shopId found!');
+            showToast('Error: No shop ID found. Please log out and log in again.');
+            return;
+        }
 
         showLoading();
 
@@ -153,29 +160,37 @@ const Shop = {
                     close: document.getElementById(`hours-${day}-close`)?.value || '18:00'
                 };
             });
+            console.log('Opening hours collected:', openingHours);
 
             // Upload images if changed
             let logoFileId = this.currentShop?.logoFileId || null;
             let bannerFileId = this.currentShop?.bannerFileId || null;
 
             const logoInput = document.getElementById('logo-input');
-            if (logoInput.files[0]) {
+            if (logoInput.files && logoInput.files[0]) {
+                console.log('Uploading logo to Telegram...');
                 const result = await TelegramAPI.uploadFile(logoInput.files[0]);
+                console.log('Logo upload result:', result);
                 if (result.success) {
                     logoFileId = result.fileId;
+                } else {
+                    console.error('Logo upload failed:', result.error);
                 }
             }
 
             const bannerInput = document.getElementById('banner-input');
-            if (bannerInput.files[0]) {
+            if (bannerInput.files && bannerInput.files[0]) {
+                console.log('Uploading banner to Telegram...');
                 const result = await TelegramAPI.uploadFile(bannerInput.files[0]);
+                console.log('Banner upload result:', result);
                 if (result.success) {
                     bannerFileId = result.fileId;
+                } else {
+                    console.error('Banner upload failed:', result.error);
                 }
             }
 
-            // Update shop document
-            await db.collection(COLLECTIONS.SHOPS).doc(Auth.userData.shopId).update({
+            const shopData = {
                 name: document.getElementById('shop-name').value,
                 description: document.getElementById('shop-description').value,
                 about: document.getElementById('shop-about').value,
@@ -188,7 +203,15 @@ const Shop = {
                 logoFileId: logoFileId,
                 bannerFileId: bannerFileId,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            };
+
+            console.log('Saving to Firestore:', shopData);
+            console.log('Shop ID:', Auth.userData.shopId);
+
+            // Update shop document
+            await db.collection(COLLECTIONS.SHOPS).doc(Auth.userData.shopId).update(shopData);
+
+            console.log('=== SAVE SUCCESSFUL ===');
 
             await this.load();
             hideLoading();
@@ -196,7 +219,9 @@ const Shop = {
         } catch (error) {
             hideLoading();
             console.error('Save shop error:', error);
-            showToast('Failed to save shop');
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
+            showToast('Failed to save: ' + error.message);
         }
     },
 

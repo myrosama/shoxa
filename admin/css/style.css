@@ -596,28 +596,33 @@ body {
 
 /* Hours Grid */
 .hours-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .hour-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 100px 1fr auto 1fr;
   align-items: center;
   gap: 12px;
 }
 
 .hour-row .day {
-  width: 80px;
   font-weight: 500;
+  font-size: 14px;
+}
+
+.hour-row span:not(.day) {
+  text-align: center;
+  color: var(--text-muted);
 }
 
 .hour-row input {
-  flex: 1;
-  padding: 8px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* Products Grid */

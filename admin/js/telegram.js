@@ -1,12 +1,50 @@
 // Telegram Bot API for Image Upload
 const TelegramAPI = {
+    // Compress image before upload
+    async compressImage(file, maxWidth = 1280, quality = 0.8) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Scale down if too large
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                    }, 'image/jpeg', quality);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    },
+
     // Upload file to Telegram channel
     async uploadFile(file) {
-        const formData = new FormData();
-        formData.append('chat_id', TELEGRAM_CONFIG.channelId);
-        formData.append('photo', file);
-
         try {
+            // Compress image first
+            console.log('Compressing image...');
+            const compressedFile = await this.compressImage(file);
+            console.log('Original size:', file.size, 'Compressed size:', compressedFile.size);
+
+            const formData = new FormData();
+            formData.append('chat_id', TELEGRAM_CONFIG.channelId);
+            formData.append('photo', compressedFile);
+
             const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_CONFIG.botToken}/sendPhoto`, {
                 method: 'POST',
                 body: formData
