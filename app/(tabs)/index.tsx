@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, Text, View, ScrollView, Image,
+  StyleSheet, Text, View, Image, ScrollView,
   TouchableOpacity, StatusBar, Dimensions, ActivityIndicator, Pressable, Platform, Animated
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { collection, query, onSnapshot } from 'firebase/firestore';
@@ -31,10 +31,6 @@ const CATEGORIES = [
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40) / 2 - 8;
 
-// Threshold values for sticky behavior
-const SEARCH_STICKY_THRESHOLD = 50; // When search bar becomes sticky
-const CATEGORY_STICKY_THRESHOLD = 350; // When categories become sticky
-
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -43,10 +39,19 @@ export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [directionModalShop, setDirectionModalShop] = useState<any>(null);
 
-  // Scroll tracking
+  // Animated scroll value
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Animation state
+  const stickySearchOpacity = useRef(new Animated.Value(0)).current;
+  const stickyCategoryOpacity = useRef(new Animated.Value(0)).current;
   const [showStickySearch, setShowStickySearch] = useState(false);
   const [showStickyCategories, setShowStickyCategories] = useState(false);
+
+  // Threshold calculations
+  const LAYER_1_HEIGHT = insets.top + 70;
+  const SEARCH_POSITION = LAYER_1_HEIGHT + 60; // Location bar height + margin
+  const CATEGORY_POSITION = SEARCH_POSITION + 250; // Search + Banner + Title
 
   useEffect(() => {
     const unsubscribe = onSnapshot(query(collection(db, 'artifacts', 'default-app-id', 'public', 'data', 'shops')), (snapshot) => {
@@ -62,14 +67,81 @@ export default function HomeScreen() {
     setDirectionModalShop(shop);
   };
 
-  // Handle scroll events
-  const handleScroll = (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    setShowStickySearch(offsetY > SEARCH_STICKY_THRESHOLD);
-    setShowStickyCategories(offsetY > CATEGORY_STICKY_THRESHOLD);
-  };
+  // Handle scroll with animations
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: false,
+      listener: (event: any) => {
+        const offsetY = event.nativeEvent.contentOffset.y;
 
-  const LAYER_1_HEIGHT = insets.top + 60;
+        // Search sticky trigger
+        if (offsetY > SEARCH_POSITION - 20 && !showStickySearch) {
+          setShowStickySearch(true);
+          Animated.timing(stickySearchOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        } else if (offsetY <= SEARCH_POSITION - 20 && showStickySearch) {
+          Animated.timing(stickySearchOpacity, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }).start(() => setShowStickySearch(false));
+        }
+
+        // Category sticky trigger
+        if (offsetY > CATEGORY_POSITION - 20 && !showStickyCategories) {
+          setShowStickyCategories(true);
+          Animated.timing(stickyCategoryOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        } else if (offsetY <= CATEGORY_POSITION - 20 && showStickyCategories) {
+          Animated.timing(stickyCategoryOpacity, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }).start(() => setShowStickyCategories(false));
+        }
+      }
+    }
+  );
+
+  // Cylinder roll animation for location bar
+  const locationBarRotation = scrollY.interpolate({
+    inputRange: [0, SEARCH_POSITION],
+    outputRange: ['0deg', '-90deg'],
+    extrapolate: 'clamp',
+  });
+
+  const locationBarTranslateY = scrollY.interpolate({
+    inputRange: [0, SEARCH_POSITION],
+    outputRange: [0, -30],
+    extrapolate: 'clamp',
+  });
+
+  const locationBarOpacity = scrollY.interpolate({
+    inputRange: [0, SEARCH_POSITION * 0.7, SEARCH_POSITION],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
+  });
+
+  // In-flow search bar opacity (hidden when sticky appears)
+  const inFlowSearchOpacity = scrollY.interpolate({
+    inputRange: [SEARCH_POSITION - 40, SEARCH_POSITION],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  // In-flow categories opacity
+  const inFlowCategoryOpacity = scrollY.interpolate({
+    inputRange: [CATEGORY_POSITION - 40, CATEGORY_POSITION],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
 
   return (
     <View style={styles.container}>
@@ -88,9 +160,12 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* --- FIXED STICKY HEADERS (Appear based on scroll) --- */}
+      {/* --- FIXED STICKY HEADERS (Fade in based on scroll) --- */}
       {showStickySearch && (
-        <View style={[styles.fixedStickyHeader, { top: insets.top }]}>
+        <Animated.View style={[
+          styles.fixedStickyHeader,
+          { top: insets.top, opacity: stickySearchOpacity }
+        ]}>
           <View style={styles.stickySearchContainer}>
             <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
               <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
@@ -98,8 +173,8 @@ export default function HomeScreen() {
             </Pressable>
           </View>
           {showStickyCategories && (
-            <View style={styles.stickyCategoriesContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
+            <Animated.View style={[styles.stickyCategoriesContainer, { opacity: stickyCategoryOpacity }]}>
+              <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
                 {CATEGORIES.map((cat) => {
                   const isActive = activeCategory === cat.id;
                   return (
@@ -113,14 +188,14 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
-            </View>
+              </Animated.ScrollView>
+            </Animated.View>
           )}
-        </View>
+        </Animated.View>
       )}
 
       {/* --- LAYER 2: SCROLLABLE CONTENT --- */}
-      <ScrollView
+      <Animated.ScrollView
         contentContainerStyle={{
           paddingTop: LAYER_1_HEIGHT,
           paddingBottom: 120
@@ -130,8 +205,18 @@ export default function HomeScreen() {
         scrollEventThrottle={16}
       >
 
-        {/* Location Bar */}
-        <View style={styles.locationBarWrapper}>
+        {/* Location Bar - Cylinder Roll Animation */}
+        <Animated.View style={[
+          styles.locationBarWrapper,
+          {
+            opacity: locationBarOpacity,
+            transform: [
+              { perspective: 1000 },
+              { rotateX: locationBarRotation },
+              { translateY: locationBarTranslateY },
+            ]
+          }
+        ]}>
           <View style={styles.locationBarBackground} />
           <TouchableOpacity style={styles.locationBar}>
             <View style={styles.locationIconBg}>
@@ -142,15 +227,15 @@ export default function HomeScreen() {
             </Text>
             <Ionicons name="chevron-down" size={14} color={COLORS.gray} />
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
-        {/* Search Bar (in-flow, not sticky) */}
-        <View style={styles.searchWrapper}>
+        {/* Search Bar (in-flow, fades out when sticky appears) */}
+        <Animated.View style={[styles.searchWrapper, { opacity: inFlowSearchOpacity }]}>
           <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
             <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
             <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
           </Pressable>
-        </View>
+        </Animated.View>
 
         {/* Banner */}
         <View style={styles.contentBackground}>
@@ -172,8 +257,8 @@ export default function HomeScreen() {
           <Text style={styles.categoryTitle}>Categories</Text>
         </View>
 
-        {/* Category Pills (in-flow, duplicated for sticky) */}
-        <View style={styles.categoriesSection}>
+        {/* Category Pills (in-flow, fades out when sticky appears) */}
+        <Animated.View style={[styles.categoriesSection, { opacity: inFlowCategoryOpacity }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
             {CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.id;
@@ -189,7 +274,7 @@ export default function HomeScreen() {
               );
             })}
           </ScrollView>
-        </View>
+        </Animated.View>
 
         {/* Shop List */}
         <View style={[styles.listSection, styles.contentBackground]}>
@@ -236,7 +321,7 @@ export default function HomeScreen() {
           )}
         </View>
 
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Direction Modal */}
       {directionModalShop && (
