@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, Image,
-  TouchableOpacity, StatusBar, Dimensions, ActivityIndicator, Pressable, Platform
+  TouchableOpacity, StatusBar, Dimensions, ActivityIndicator, Pressable, Platform, Animated
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,13 +31,22 @@ const CATEGORIES = [
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40) / 2 - 8;
 
+// Threshold values for sticky behavior
+const SEARCH_STICKY_THRESHOLD = 50; // When search bar becomes sticky
+const CATEGORY_STICKY_THRESHOLD = 350; // When categories become sticky
+
 export default function HomeScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets(); // Get safe area insets for precise positioning
+  const insets = useSafeAreaInsets();
   const [shops, setShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
   const [directionModalShop, setDirectionModalShop] = useState<any>(null);
+
+  // Scroll tracking
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [showStickySearch, setShowStickySearch] = useState(false);
+  const [showStickyCategories, setShowStickyCategories] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(query(collection(db, 'artifacts', 'default-app-id', 'public', 'data', 'shops')), (snapshot) => {
@@ -53,17 +62,20 @@ export default function HomeScreen() {
     setDirectionModalShop(shop);
   };
 
-  // Layer 1: Welcome Header Height
-  // This content sits BEHIND the scroll view. 
-  // We want the scroll view to start just below the "Welcome" text initially.
+  // Handle scroll events
+  const handleScroll = (event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setShowStickySearch(offsetY > SEARCH_STICKY_THRESHOLD);
+    setShowStickyCategories(offsetY > CATEGORY_STICKY_THRESHOLD);
+  };
+
   const LAYER_1_HEIGHT = insets.top + 60;
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      {/* --- LAYER 1: FIXED BACKGROUND (ONLY Welcome + Logo) --- */}
-      {/* Visual background that gets covered */}
+      {/* --- LAYER 1: FIXED BACKGROUND (Welcome + Logo) --- */}
       <View style={[styles.fixedLayer, { paddingTop: insets.top, height: 200 }]}>
         <View style={styles.headerRow}>
           <View>
@@ -76,6 +88,37 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* --- FIXED STICKY HEADERS (Appear based on scroll) --- */}
+      {showStickySearch && (
+        <View style={[styles.fixedStickyHeader, { top: insets.top }]}>
+          <View style={styles.stickySearchContainer}>
+            <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
+              <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
+            </Pressable>
+          </View>
+          {showStickyCategories && (
+            <View style={styles.stickyCategoriesContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
+                {CATEGORIES.map((cat) => {
+                  const isActive = activeCategory === cat.id;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
+                      onPress={() => setActiveCategory(cat.id)}
+                    >
+                      <Ionicons name={cat.icon as any} size={18} color={isActive ? COLORS.white : '#5D4037'} style={{ marginRight: 6 }} />
+                      <Text style={[styles.categoryText, isActive ? { color: COLORS.white } : { color: '#5D4037' }]}>{cat.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+      )}
+
       {/* --- LAYER 2: SCROLLABLE CONTENT --- */}
       <ScrollView
         contentContainerStyle={{
@@ -83,10 +126,11 @@ export default function HomeScreen() {
           paddingBottom: 120
         }}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1, 4]} // Search Bar (1) and Category Pills (4) stick
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
 
-        {/* Index 0: Location Bar - rolls OVER the welcome text */}
+        {/* Location Bar */}
         <View style={styles.locationBarWrapper}>
           <View style={styles.locationBarBackground} />
           <TouchableOpacity style={styles.locationBar}>
@@ -100,16 +144,15 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Index 1: STICKY SEARCH BAR */}
-        <View style={styles.stickySearchWrapper}>
-          <View style={styles.searchBackgroundCover} />
+        {/* Search Bar (in-flow, not sticky) */}
+        <View style={styles.searchWrapper}>
           <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
             <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
             <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
           </Pressable>
         </View>
 
-        {/* Index 2: Banner (scrolls normally) */}
+        {/* Banner */}
         <View style={styles.contentBackground}>
           <TouchableOpacity style={styles.bannerContainer} onPress={() => router.push('/(tabs)/explore')}>
             <View style={styles.bannerTextContainer}>
@@ -124,14 +167,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Index 3: Categories Title (scrolls away, NOT sticky) */}
+        {/* Categories Title (scrolls away) */}
         <View style={styles.categoriesTitleSection}>
           <Text style={styles.categoryTitle}>Categories</Text>
         </View>
 
-        {/* Index 4: STICKY Category Pills (joins search bar when sticky) */}
-        <View style={styles.stickyCategories}>
-          <View style={styles.categoryBackgroundCover} />
+        {/* Category Pills (in-flow, duplicated for sticky) */}
+        <View style={styles.categoriesSection}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
             {CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.id;
@@ -149,7 +191,7 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Index 4: Shop List */}
+        {/* Shop List */}
         <View style={[styles.listSection, styles.contentBackground]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitleNoPadding}>Recommended for you</Text>
@@ -262,22 +304,38 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
-  // Sticky Search
-  stickySearchWrapper: {
-    paddingHorizontal: 20, paddingBottom: 10, paddingTop: 10,
-    zIndex: 100, // High z-index to stay on top
-    elevation: 10, // Shadow for Android
+  // Fixed Sticky Header (appears on scroll)
+  fixedStickyHeader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.background,
+    zIndex: 1000,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  searchBackgroundCover: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.background, // Solid background
-    opacity: 1, // Fully opaque to hide scrolling content
+  stickySearchContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  stickyCategoriesContainer: {
+    paddingBottom: 10,
+  },
+
+  // In-flow Search Wrapper
+  searchWrapper: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    paddingTop: 5,
   },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
     height: 50, borderRadius: 15, paddingLeft: 15,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 3,
-    zIndex: 2,
   },
   searchIcon: { marginRight: 10 },
   searchInputPlaceholder: { color: '#897461', fontSize: 16 },
@@ -304,15 +362,11 @@ const styles = StyleSheet.create({
     color: COLORS.dark,
   },
 
-  // Sticky Category Pills
-  stickyCategories: {
+  // In-flow Categories Section
+  categoriesSection: {
     backgroundColor: COLORS.background,
     paddingTop: 5,
     paddingBottom: 15,
-  },
-  categoryBackgroundCover: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.background,
   },
   categoriesList: { paddingLeft: 20, paddingRight: 20 },
   categoryPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 30, marginRight: 10, borderWidth: 1 },
