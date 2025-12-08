@@ -861,6 +861,7 @@ body {
   /* Compact stats row for mobile */
   .stats-grid {
     display: flex;
+    justify-content: center;
     overflow-x: auto;
     gap: 10px;
     margin-bottom: 16px;
