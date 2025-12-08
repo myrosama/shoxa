@@ -164,9 +164,9 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* --- FIXED STICKY HEADERS (Fade in based on scroll) --- */}
+      {/* --- FIXED STICKY SEARCH (Only shows when scrolled) --- */}
       {showStickySearch && (
-        <Animated.View style={[
+        <View style={[
           styles.fixedStickyHeader,
           { top: insets.top }
         ]}>
@@ -178,7 +178,7 @@ export default function HomeScreen() {
           </View>
           {showStickyCategories && (
             <View style={styles.stickyCategoriesContainer}>
-              <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
                 {CATEGORIES.map((cat) => {
                   const isActive = activeCategory === cat.id;
                   return (
@@ -192,10 +192,10 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                   );
                 })}
-              </Animated.ScrollView>
+              </ScrollView>
             </View>
           )}
-        </Animated.View>
+        </View>
       )}
 
       {/* --- LAYER 2: SCROLLABLE CONTENT --- */}
@@ -203,7 +203,7 @@ export default function HomeScreen() {
         style={{
           marginTop: insets.top + 80,
           transform: [{ translateY: layer2TranslateY }],
-          backgroundColor: '#FFFFFF', // Solid white background for Layer 2
+          backgroundColor: COLORS.background, // Same as Layer 1
           borderTopLeftRadius: 25,
           borderTopRightRadius: 25,
           // Top shadow to make roll-over visible
@@ -216,7 +216,6 @@ export default function HomeScreen() {
         contentContainerStyle={{
           paddingBottom: 120,
           paddingTop: 15,
-          backgroundColor: '#FFFFFF',
         }}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
@@ -246,13 +245,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Search Bar (in-flow, fades when sticky appears) */}
-        <Animated.View style={[styles.searchWrapper, { opacity: inFlowSearchOpacity }]}>
+        {/* Search Bar (in-flow, stays visible - no fade) */}
+        <View style={styles.searchWrapper}>
           <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
             <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
             <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
           </Pressable>
-        </Animated.View>
+        </View>
 
         {/* Banner */}
         <View style={styles.contentBackground}>
@@ -395,7 +394,7 @@ const styles = StyleSheet.create({
   locationBarWrapper: {
     paddingHorizontal: 20,
     marginBottom: 10,
-    backgroundColor: '#FFFFFF', // Match Layer 2 background
+    backgroundColor: COLORS.background, // Match Layer 2
   },
   locationBarBackground: {
     display: 'none', // No longer needed
@@ -441,7 +440,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 10,
     paddingTop: 5,
-    backgroundColor: '#FFFFFF', // Match Layer 2 background
+    backgroundColor: COLORS.background, // Match Layer 2
   },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
