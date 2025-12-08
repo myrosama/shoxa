@@ -43,23 +43,13 @@ export default function HomeScreen() {
   // Animated scroll value
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // The CLIP LINE - where content "rolls over" behind (at Good Morning level)
-  const CLIP_LINE = insets.top + 55; // Just below status bar, at Good Morning text
+  // Scroll threshold - when user has scrolled past categories
+  const CATEGORY_THRESHOLD = 340;
 
-  // Content positions from top of scroll content
-  const LOCATION_BAR_TOP = 0;
-  const SEARCH_BAR_TOP = 60; // After location bar
-  const BANNER_TOP = SEARCH_BAR_TOP + 65;
-  const CATEGORIES_TOP = BANNER_TOP + 180; // After banner
-
-  // When scroll value causes element to reach clip line
-  const LOCATION_STICKY_SCROLL = 30; // Location rolls over first
-  const SEARCH_STICKY_SCROLL = 70; // Search becomes sticky
-  const CATEGORY_STICKY_SCROLL = 340; // Categories become sticky
-
-  // Sticky state
-  const [showStickySearch, setShowStickySearch] = useState(false);
-  const [showStickyCategories, setShowStickyCategories] = useState(false);
+  // Scroll direction tracking for reveal-on-scroll-up
+  const lastScrollY = useRef(0);
+  const [showRevealHeader, setShowRevealHeader] = useState(false);
+  const revealHeaderAnim = useRef(new Animated.Value(-150)).current; // Start hidden above screen
 
   useEffect(() => {
     const unsubscribe = onSnapshot(query(collection(db, 'artifacts', 'default-app-id', 'public', 'data', 'shops')), (snapshot) => {
@@ -75,6 +65,16 @@ export default function HomeScreen() {
     setDirectionModalShop(shop);
   };
 
+  // Animate reveal header in/out
+  const animateRevealHeader = (show: boolean) => {
+    Animated.spring(revealHeaderAnim, {
+      toValue: show ? 0 : -150,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 12,
+    }).start();
+  };
+
   // Handle scroll events
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -82,36 +82,48 @@ export default function HomeScreen() {
       useNativeDriver: false,
       listener: (event: any) => {
         const offsetY = event.nativeEvent.contentOffset.y;
+        const isScrollingUp = offsetY < lastScrollY.current;
+        const scrollDelta = Math.abs(offsetY - lastScrollY.current);
 
-        // Search becomes sticky when it reaches the clip line
-        if (offsetY >= SEARCH_STICKY_SCROLL && !showStickySearch) {
-          setShowStickySearch(true);
-        } else if (offsetY < SEARCH_STICKY_SCROLL && showStickySearch) {
-          setShowStickySearch(false);
+        // Only show reveal header when:
+        // 1. User has scrolled past categories (offsetY > CATEGORY_THRESHOLD)
+        // 2. User is scrolling UP
+        // 3. Scroll delta is significant enough (> 5px to avoid jitter)
+        if (offsetY > CATEGORY_THRESHOLD) {
+          if (isScrollingUp && scrollDelta > 5) {
+            if (!showRevealHeader) {
+              setShowRevealHeader(true);
+              animateRevealHeader(true);
+            }
+          } else if (!isScrollingUp && scrollDelta > 10) {
+            if (showRevealHeader) {
+              setShowRevealHeader(false);
+              animateRevealHeader(false);
+            }
+          }
+        } else {
+          // Hide reveal header when scrolled back up to categories area
+          if (showRevealHeader) {
+            setShowRevealHeader(false);
+            animateRevealHeader(false);
+          }
         }
 
-        // Categories become sticky when they reach clip line
-        if (offsetY >= CATEGORY_STICKY_SCROLL && !showStickyCategories) {
-          setShowStickyCategories(true);
-        } else if (offsetY < CATEGORY_STICKY_SCROLL && showStickyCategories) {
-          setShowStickyCategories(false);
-        }
+        lastScrollY.current = offsetY;
       }
     }
   );
 
   // LAYER 2 MOVEMENT - Entire layer moves UP as user scrolls
-  // This brings content up to cover welcome text BEFORE roll happens
   const layer2TranslateY = scrollY.interpolate({
     inputRange: [0, 80],
-    outputRange: [0, -80], // Move up 80px (covers welcome text)
+    outputRange: [0, -80],
     extrapolate: 'clamp',
   });
 
   // CYLINDER ROLL for location bar
-  // Positive rotation = top of element goes backward (rolls over forward like paper on cylinder)
   const locationBarRotation = scrollY.interpolate({
-    inputRange: [60, 80, 100], // Starts rolling AFTER layer moves up
+    inputRange: [60, 80, 100],
     outputRange: ['0deg', '45deg', '90deg'],
     extrapolate: 'clamp',
   });
@@ -122,36 +134,10 @@ export default function HomeScreen() {
     extrapolate: 'clamp',
   });
 
-  // Search bar - fades out when sticky appears (no roll)
-  const inFlowSearchOpacity = scrollY.interpolate({
-    inputRange: [SEARCH_STICKY_SCROLL - 20, SEARCH_STICKY_SCROLL],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  // Categories - CYLINDER ROLL (top goes back)
-  const categoriesRotation = scrollY.interpolate({
-    inputRange: [CATEGORY_STICKY_SCROLL - 60, CATEGORY_STICKY_SCROLL - 20, CATEGORY_STICKY_SCROLL],
-    outputRange: ['0deg', '45deg', '90deg'],
-    extrapolate: 'clamp',
-  });
-
-  const categoriesTranslateY = scrollY.interpolate({
-    inputRange: [CATEGORY_STICKY_SCROLL - 60, CATEGORY_STICKY_SCROLL],
-    outputRange: [0, -40],
-    extrapolate: 'clamp',
-  });
-
-  const categoriesOpacity = scrollY.interpolate({
-    inputRange: [CATEGORY_STICKY_SCROLL - 40, CATEGORY_STICKY_SCROLL - 10, CATEGORY_STICKY_SCROLL],
-    outputRange: [1, 0.4, 0],
-    extrapolate: 'clamp',
-  });
-
-  // Welcome text fade/blur effect - fades as Layer 2 rolls over
+  // Welcome text fade/blur effect
   const welcomeOpacity = scrollY.interpolate({
     inputRange: [0, 60, 100],
-    outputRange: [1, 0.6, 0.2], // Fades to simulate blur
+    outputRange: [1, 0.6, 0.2],
     extrapolate: 'clamp',
   });
 
@@ -180,44 +166,36 @@ export default function HomeScreen() {
         </View>
       </Animated.View>
 
-      {/* --- FIXED STICKY HEADER (Search + Categories) --- */}
-      {showStickySearch && (
-        <View style={[
-          styles.fixedStickyHeader,
-          { top: insets.top }
-        ]}>
-          <View style={styles.stickySearchContainer}>
-            <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
-              <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
-              <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
-            </Pressable>
-          </View>
+      {/* --- REVEAL-ON-SCROLL-UP HEADER (Search + Categories) --- */}
+      <Animated.View style={[
+        styles.revealHeader,
+        {
+          top: insets.top,
+          transform: [{ translateY: revealHeaderAnim }]
+        }
+      ]}>
+        <View style={styles.revealSearchContainer}>
+          <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
+            <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
+          </Pressable>
         </View>
-      )}
-
-      {/* --- FIXED STICKY CATEGORIES (Below search) --- */}
-      {showStickyCategories && (
-        <View style={[
-          styles.fixedCategoriesHeader,
-          { top: insets.top + 70 }
-        ]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
-            {CATEGORIES.map((cat) => {
-              const isActive = activeCategory === cat.id;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
-                  onPress={() => setActiveCategory(cat.id)}
-                >
-                  <Ionicons name={cat.icon as any} size={18} color={isActive ? COLORS.white : '#5D4037'} style={{ marginRight: 6 }} />
-                  <Text style={[styles.categoryText, isActive ? { color: COLORS.white } : { color: '#5D4037' }]}>{cat.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
+          {CATEGORIES.map((cat) => {
+            const isActive = activeCategory === cat.id;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
+                onPress={() => setActiveCategory(cat.id)}
+              >
+                <Ionicons name={cat.icon as any} size={18} color={isActive ? COLORS.white : '#5D4037'} style={{ marginRight: 6 }} />
+                <Text style={[styles.categoryText, isActive ? { color: COLORS.white } : { color: '#5D4037' }]}>{cat.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </Animated.View>
 
       {/* --- LAYER 2: SCROLLABLE CONTENT --- */}
       <Animated.ScrollView
@@ -424,31 +402,26 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
-  // Fixed Sticky Header (appears on scroll)
-  fixedStickyHeader: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-  },
-  stickySearchContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-  stickyCategoriesContainer: {
-    paddingBottom: 10,
-  },
-  // Fixed categories header (appears below search when scrolled)
-  fixedCategoriesHeader: {
+  // Reveal-on-scroll-up Header
+  revealHeader: {
     position: 'absolute',
     left: 0,
     right: 0,
     backgroundColor: COLORS.background,
-    zIndex: 999,
-    elevation: 19,
-    paddingVertical: 10,
-    paddingHorizontal: 5,
+    zIndex: 1000,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  revealSearchContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
 
   // In-flow Search Wrapper
