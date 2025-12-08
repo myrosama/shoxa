@@ -1,5 +1,13 @@
 {
   "projects": {
     "default": "shoxabranch"
+  },
+  "targets": {
+    "shoxabranch": {
+      "hosting": {
+        "main": ["shoxabranch"],
+        "admin": ["shoxa-admin"]
+      }
+    }
   }
 }
