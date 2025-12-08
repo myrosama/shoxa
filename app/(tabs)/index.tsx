@@ -289,11 +289,24 @@ const styles = StyleSheet.create({
   bannerBtnText: { color: COLORS.white, fontSize: 12, fontWeight: 'bold' },
   bannerImage: { width: 120, height: '100%', resizeMode: 'cover' },
 
-  // Categories Section
+  // Categories Section (Sticky)
   categorySection: {
     backgroundColor: COLORS.background,
-    paddingTop: 5,
+    paddingTop: 10,
     paddingBottom: 15,
+  },
+  categoryBackgroundCover: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.background,
+  },
+  categorySectionHeader: {
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  categoryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.dark,
   },
   categoriesList: { paddingLeft: 20, paddingRight: 20 },
   categoryPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 30, marginRight: 10, borderWidth: 1 },
