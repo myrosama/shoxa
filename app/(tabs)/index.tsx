@@ -11,6 +11,7 @@ import { db } from '@/configs/FirebaseConfig';
 
 const COLORS = {
   background: '#FDF6E3',
+  layer1Background: '#F5D6BA', // More orangy/peachy for Layer 1
   primary: '#C67C43',
   secondary: '#A0522D',
   dark: '#333333',
@@ -147,12 +148,27 @@ export default function HomeScreen() {
     extrapolate: 'clamp',
   });
 
+  // Welcome text fade/blur effect - fades as Layer 2 rolls over
+  const welcomeOpacity = scrollY.interpolate({
+    inputRange: [0, 60, 100],
+    outputRange: [1, 0.6, 0.2], // Fades to simulate blur
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
       {/* --- LAYER 1: FIXED BACKGROUND (Welcome + Logo) --- */}
-      <View style={[styles.fixedLayer, { paddingTop: insets.top, height: 200 }]}>
+      <Animated.View style={[
+        styles.fixedLayer,
+        {
+          paddingTop: insets.top,
+          height: 200,
+          backgroundColor: COLORS.layer1Background,
+          opacity: welcomeOpacity,
+        }
+      ]}>
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.greeting}>Good Morning,</Text>
@@ -162,9 +178,9 @@ export default function HomeScreen() {
             <Image source={require('@/assets/logo.png')} style={styles.logo} resizeMode="contain" />
           </View>
         </View>
-      </View>
+      </Animated.View>
 
-      {/* --- FIXED STICKY SEARCH (Only shows when scrolled) --- */}
+      {/* --- FIXED STICKY HEADER (Search + Categories) --- */}
       {showStickySearch && (
         <View style={[
           styles.fixedStickyHeader,
@@ -176,25 +192,30 @@ export default function HomeScreen() {
               <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
             </Pressable>
           </View>
-          {showStickyCategories && (
-            <View style={styles.stickyCategoriesContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
-                {CATEGORIES.map((cat) => {
-                  const isActive = activeCategory === cat.id;
-                  return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
-                      onPress={() => setActiveCategory(cat.id)}
-                    >
-                      <Ionicons name={cat.icon as any} size={18} color={isActive ? COLORS.white : '#5D4037'} style={{ marginRight: 6 }} />
-                      <Text style={[styles.categoryText, isActive ? { color: COLORS.white } : { color: '#5D4037' }]}>{cat.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
+        </View>
+      )}
+
+      {/* --- FIXED STICKY CATEGORIES (Below search) --- */}
+      {showStickyCategories && (
+        <View style={[
+          styles.fixedCategoriesHeader,
+          { top: insets.top + 70 }
+        ]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
+            {CATEGORIES.map((cat) => {
+              const isActive = activeCategory === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
+                  onPress={() => setActiveCategory(cat.id)}
+                >
+                  <Ionicons name={cat.icon as any} size={18} color={isActive ? COLORS.white : '#5D4037'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.categoryText, isActive ? { color: COLORS.white } : { color: '#5D4037' }]}>{cat.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
       )}
 
@@ -273,18 +294,8 @@ export default function HomeScreen() {
           <Text style={styles.categoryTitle}>Categories</Text>
         </View>
 
-        {/* Category Pills (in-flow, rolls over when reaching clip line) */}
-        <Animated.View style={[
-          styles.categoriesSection,
-          {
-            opacity: categoriesOpacity,
-            transform: [
-              { perspective: 800 },
-              { translateY: categoriesTranslateY },
-              { rotateX: categoriesRotation }
-            ]
-          }
-        ]}>
+        {/* Category Pills (in-flow, stays visible - no fade) */}
+        <View style={styles.categoriesSection}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
             {CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.id;
@@ -300,7 +311,7 @@ export default function HomeScreen() {
               );
             })}
           </ScrollView>
-        </Animated.View>
+        </View>
 
         {/* Shop List */}
         <View style={[styles.listSection, styles.contentBackground]}>
@@ -433,6 +444,17 @@ const styles = StyleSheet.create({
   },
   stickyCategoriesContainer: {
     paddingBottom: 10,
+  },
+  // Fixed categories header (appears below search when scrolled)
+  fixedCategoriesHeader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.background,
+    zIndex: 999,
+    elevation: 19,
+    paddingVertical: 10,
+    paddingHorizontal: 5,
   },
 
   // In-flow Search Wrapper
