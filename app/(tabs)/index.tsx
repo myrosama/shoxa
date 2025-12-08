@@ -176,22 +176,10 @@ export default function HomeScreen() {
             transform: [{ translateY: revealHeaderAnim }]
           }
         ]}>
-          {/* Rounded top handle for cylinder effect */}
-          <View style={styles.revealHandleContainer}>
-            <View style={styles.revealHandle} />
-          </View>
-
-          {/* Location Bar */}
-          <View style={styles.revealLocationContainer}>
-            <TouchableOpacity style={styles.revealLocationBar}>
-              <View style={styles.locationIconBg}>
-                <Ionicons name="location" size={14} color={COLORS.white} />
-              </View>
-              <Text style={styles.locationText} numberOfLines={1}>
-                Home • Tashkent City, Uzbekistan
-              </Text>
-              <Ionicons name="chevron-down" size={14} color={COLORS.gray} />
-            </TouchableOpacity>
+          {/* Centered Title */}
+          <View style={styles.revealTitleContainer}>
+            <Text style={styles.revealTitle}>SHOXA</Text>
+            <Text style={styles.revealSubtitle}>Tashkent City, Uzbekistan</Text>
           </View>
 
           {/* Search Bar */}
@@ -439,35 +427,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     paddingBottom: 12,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
   },
-  revealHandleContainer: {
+  revealTitleContainer: {
     alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 5,
+    paddingTop: 15,
+    paddingBottom: 10,
   },
-  revealHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#D4C4B5',
-    borderRadius: 2,
+  revealTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.dark,
   },
-  revealLocationContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-  },
-  revealLocationBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    elevation: 2,
+  revealSubtitle: {
+    fontSize: 13,
+    color: COLORS.gray,
+    marginTop: 2,
   },
   revealSearchContainer: {
     paddingHorizontal: 20,
