@@ -99,42 +99,51 @@ export default function HomeScreen() {
     }
   );
 
-  // CYLINDER ROLL for location bar - rolls over as it reaches clip line
+  // CYLINDER ROLL for location bar
+  // Positive rotation = top of element goes backward (rolls over forward like paper on cylinder)
+  // Also moves UP (translateY negative) to cover the welcome text
   const locationBarRotation = scrollY.interpolate({
-    inputRange: [0, LOCATION_STICKY_SCROLL - 10, LOCATION_STICKY_SCROLL],
-    outputRange: ['0deg', '-45deg', '-90deg'],
+    inputRange: [0, LOCATION_STICKY_SCROLL * 0.5, LOCATION_STICKY_SCROLL],
+    outputRange: ['0deg', '45deg', '90deg'], // POSITIVE = rolls forward (top goes back)
+    extrapolate: 'clamp',
+  });
+
+  // Move UP as it rolls (cylinder moving upward)
+  const locationBarTranslateY = scrollY.interpolate({
+    inputRange: [0, LOCATION_STICKY_SCROLL],
+    outputRange: [0, -50], // Moves UP 50px
     extrapolate: 'clamp',
   });
 
   const locationBarOpacity = scrollY.interpolate({
-    inputRange: [0, LOCATION_STICKY_SCROLL - 15, LOCATION_STICKY_SCROLL],
-    outputRange: [1, 0.5, 0],
+    inputRange: [0, LOCATION_STICKY_SCROLL * 0.6, LOCATION_STICKY_SCROLL],
+    outputRange: [1, 0.4, 0],
     extrapolate: 'clamp',
   });
 
-  const locationBarScale = scrollY.interpolate({
-    inputRange: [0, LOCATION_STICKY_SCROLL],
-    outputRange: [1, 0.95],
-    extrapolate: 'clamp',
-  });
-
-  // Search bar - NO roll animation, just fades out when sticky appears
+  // Search bar - fades out when sticky appears (no roll)
   const inFlowSearchOpacity = scrollY.interpolate({
     inputRange: [SEARCH_STICKY_SCROLL - 20, SEARCH_STICKY_SCROLL],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
-  // Categories - CYLINDER ROLL as they reach clip line
+  // Categories - CYLINDER ROLL (top goes back)
   const categoriesRotation = scrollY.interpolate({
     inputRange: [CATEGORY_STICKY_SCROLL - 60, CATEGORY_STICKY_SCROLL - 20, CATEGORY_STICKY_SCROLL],
-    outputRange: ['0deg', '-45deg', '-90deg'],
+    outputRange: ['0deg', '45deg', '90deg'], // POSITIVE = rolls forward
+    extrapolate: 'clamp',
+  });
+
+  const categoriesTranslateY = scrollY.interpolate({
+    inputRange: [CATEGORY_STICKY_SCROLL - 60, CATEGORY_STICKY_SCROLL],
+    outputRange: [0, -40], // Moves UP
     extrapolate: 'clamp',
   });
 
   const categoriesOpacity = scrollY.interpolate({
     inputRange: [CATEGORY_STICKY_SCROLL - 40, CATEGORY_STICKY_SCROLL - 10, CATEGORY_STICKY_SCROLL],
-    outputRange: [1, 0.5, 0],
+    outputRange: [1, 0.4, 0],
     extrapolate: 'clamp',
   });
 
@@ -189,11 +198,13 @@ export default function HomeScreen() {
         </Animated.View>
       )}
 
-      {/* --- LAYER 2: SCROLLABLE CONTENT --- */}
+      {/* --- LAYER 2: SCROLLABLE CONTENT (with solid background to cover welcome text) --- */}
       <Animated.ScrollView
+        style={{ backgroundColor: COLORS.background }}
         contentContainerStyle={{
           paddingTop: CLIP_LINE + 5,
-          paddingBottom: 120
+          paddingBottom: 120,
+          backgroundColor: COLORS.background,
         }}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
@@ -207,8 +218,8 @@ export default function HomeScreen() {
             opacity: locationBarOpacity,
             transform: [
               { perspective: 1000 },
+              { translateY: locationBarTranslateY },
               { rotateX: locationBarRotation },
-              { scale: locationBarScale },
             ]
           }
         ]}>
@@ -252,8 +263,18 @@ export default function HomeScreen() {
           <Text style={styles.categoryTitle}>Categories</Text>
         </View>
 
-        {/* Category Pills (in-flow, fades out when sticky appears) */}
-        <Animated.View style={[styles.categoriesSection, { opacity: categoriesOpacity, transform: [{ perspective: 800 }, { rotateX: categoriesRotation }] }]}>
+        {/* Category Pills (in-flow, rolls over when reaching clip line) */}
+        <Animated.View style={[
+          styles.categoriesSection,
+          {
+            opacity: categoriesOpacity,
+            transform: [
+              { perspective: 800 },
+              { translateY: categoriesTranslateY },
+              { rotateX: categoriesRotation }
+            ]
+          }
+        ]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
             {CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.id;
@@ -364,6 +385,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 10,
     marginBottom: 10,
+    backgroundColor: COLORS.background,
   },
   locationBarBackground: {
     ...StyleSheet.absoluteFillObject,
@@ -411,6 +433,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 10,
     paddingTop: 5,
+    backgroundColor: COLORS.background,
   },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
