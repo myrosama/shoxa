@@ -429,13 +429,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: COLORS.background,
     zIndex: 1000,
-    elevation: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   stickySearchContainer: {
     paddingHorizontal: 20,
