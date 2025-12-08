@@ -33,7 +33,10 @@ const Shop = {
         if (this.currentShop.location?.lat && this.currentShop.location?.lng) {
             document.getElementById('shop-lat').value = this.currentShop.location.lat;
             document.getElementById('shop-lng').value = this.currentShop.location.lng;
-            this.updateMapMarker(this.currentShop.location.lat, this.currentShop.location.lng);
+            // Only update marker if map is already initialized
+            if (this.map) {
+                this.updateMapMarker(this.currentShop.location.lat, this.currentShop.location.lng);
+            }
         }
 
         // Load images
