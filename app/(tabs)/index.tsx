@@ -83,10 +83,10 @@ export default function HomeScreen() {
           paddingBottom: 120
         }}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1, 3]} // Search Bar and Categories both stick
+        stickyHeaderIndices={[1, 4]} // Search Bar (1) and Category Pills (4) stick
       >
 
-        {/* Index 0: Location Bar (scrolls up and covers Welcome) */}
+        {/* Index 0: Location Bar - rolls OVER the welcome text */}
         <View style={styles.locationBarWrapper}>
           <View style={styles.locationBarBackground} />
           <TouchableOpacity style={styles.locationBar}>
@@ -124,12 +124,14 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Index 3: STICKY Categories Section */}
-        <View style={styles.categorySection}>
+        {/* Index 3: Categories Title (scrolls away, NOT sticky) */}
+        <View style={styles.categoriesTitleSection}>
+          <Text style={styles.categoryTitle}>Categories</Text>
+        </View>
+
+        {/* Index 4: STICKY Category Pills (joins search bar when sticky) */}
+        <View style={styles.stickyCategories}>
           <View style={styles.categoryBackgroundCover} />
-          <View style={styles.categorySectionHeader}>
-            <Text style={styles.categoryTitle}>Categories</Text>
-          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
             {CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.id;
@@ -289,24 +291,28 @@ const styles = StyleSheet.create({
   bannerBtnText: { color: COLORS.white, fontSize: 12, fontWeight: 'bold' },
   bannerImage: { width: 120, height: '100%', resizeMode: 'cover' },
 
-  // Categories Section (Sticky)
-  categorySection: {
+  // Categories Title Section (scrolls away)
+  categoriesTitleSection: {
     backgroundColor: COLORS.background,
-    paddingTop: 10,
-    paddingBottom: 15,
-  },
-  categoryBackgroundCover: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.background,
-  },
-  categorySectionHeader: {
     paddingHorizontal: 20,
-    marginBottom: 10,
+    paddingTop: 5,
+    paddingBottom: 10,
   },
   categoryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.dark,
+  },
+
+  // Sticky Category Pills
+  stickyCategories: {
+    backgroundColor: COLORS.background,
+    paddingTop: 5,
+    paddingBottom: 15,
+  },
+  categoryBackgroundCover: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.background,
   },
   categoriesList: { paddingLeft: 20, paddingRight: 20 },
   categoryPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 30, marginRight: 10, borderWidth: 1 },
