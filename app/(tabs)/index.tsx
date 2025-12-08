@@ -198,13 +198,11 @@ export default function HomeScreen() {
         </Animated.View>
       )}
 
-      {/* --- LAYER 2: SCROLLABLE CONTENT (with solid background to cover welcome text) --- */}
+      {/* --- LAYER 2: SCROLLABLE CONTENT --- */}
       <Animated.ScrollView
-        style={{ backgroundColor: COLORS.background }}
+        style={{ marginTop: insets.top + 80 }}
         contentContainerStyle={{
-          paddingTop: CLIP_LINE + 5,
           paddingBottom: 120,
-          backgroundColor: COLORS.background,
         }}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
