@@ -386,13 +386,13 @@ export default function HomeScreen() {
                     <View style={styles.cardFooter}>
                       <View style={styles.locationContainer}>
                         <Ionicons name="location-sharp" size={14} color={COLORS.primary} />
-                        <Text style={styles.distanceText}>{shop.location?.address?.substring(0, 20) || '...'}</Text>
+                        <Text style={styles.distanceText}>1.2 km</Text>
                       </View>
                       <TouchableOpacity
                         style={styles.locationButton}
                         onPress={(e) => { e.stopPropagation(); handleLocationClick(shop); }}
                       >
-                        <Ionicons name="location-outline" size={18} color={COLORS.white} />
+                        <Ionicons name="navigate" size={16} color={COLORS.white} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -569,10 +569,10 @@ const styles = StyleSheet.create({
   ratingContainer: { flexDirection: 'row', alignItems: 'center' },
   ratingText: { fontSize: 12, fontWeight: 'bold', color: COLORS.dark, marginLeft: 2 },
   cardType: { fontSize: 12, color: COLORS.gray, marginBottom: 10 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  locationContainer: { flexDirection: 'row', alignItems: 'center' },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  locationContainer: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   distanceText: { fontSize: 12, color: COLORS.gray, marginLeft: 4, fontWeight: '500' },
-  locationButton: { backgroundColor: '#3E2723', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  locationButton: { backgroundColor: COLORS.primary, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
 
   modalOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
