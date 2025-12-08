@@ -1,97 +1,131 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { View, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { HapticTab } from '@/components/haptic-tab';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const activeColor = Colors[colorScheme ?? 'light'].tint;
+const COLORS = {
+  primary: '#C67C43',
+  inactive: '#999999',
+  white: '#FFFFFF',
+  background: '#FDF6E3',
+};
 
+export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: activeColor,
-        tabBarInactiveTintColor: '#9E9E9E',
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.inactive,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
           position: 'absolute',
-          bottom: 20,
-          left: 20,
-          right: 20,
-          height: 65,
+          bottom: 25,
+          left: 16,
+          right: 16,
+          height: 70,
           borderRadius: 35,
+          backgroundColor: COLORS.white,
+          borderTopWidth: 0,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.15,
+          shadowRadius: 16,
           paddingBottom: 0,
           paddingTop: 0,
-          borderTopWidth: 0,
-          elevation: 15,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.12,
-          shadowRadius: 10,
-          backgroundColor: '#ffffff',
         },
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          marginBottom: 8,
+        },
         tabBarItemStyle: {
-          height: 65,
+          height: 70,
           justifyContent: 'center',
           alignItems: 'center',
+          paddingTop: 10,
         },
       }}>
 
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "grid" : "grid-outline"} color={color} />,
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons size={22} name={focused ? "home" : "home-outline"} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="feed"
         options={{
-          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "newspaper" : "newspaper-outline"} color={color} />,
+          title: 'Feed',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons size={22} name={focused ? "newspaper" : "newspaper-outline"} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
+          title: '',
           tabBarIcon: ({ focused }) => (
-            <View style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              backgroundColor: '#C67C43',
-              justifyContent: 'center',
-              alignItems: 'center',
-              position: 'absolute',
-              bottom: 15,
-              shadowColor: '#C67C43',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.35,
-              shadowRadius: 8,
-              elevation: 10,
-              borderWidth: 3,
-              borderColor: '#FDF6E3'
-            }}>
-              <Ionicons name="map" size={26} color="white" />
+            <View style={styles.centerButton}>
+              <View style={styles.centerButtonInner}>
+                <Ionicons name="map" size={26} color={COLORS.white} />
+              </View>
             </View>
           ),
+          tabBarItemStyle: {
+            height: 70,
+          },
         }}
       />
       <Tabs.Screen
         name="cart"
         options={{
-          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "cart" : "cart-outline"} color={color} />,
+          title: 'Cart',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons size={22} name={focused ? "cart" : "cart-outline"} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "person" : "person-outline"} color={color} />,
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons size={22} name={focused ? "person" : "person-outline"} color={color} />
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  centerButton: {
+    position: 'absolute',
+    top: -25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 12,
+    borderWidth: 4,
+    borderColor: COLORS.background,
+  },
+});
