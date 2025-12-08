@@ -10,6 +10,7 @@ import { collection, query, onSnapshot } from 'firebase/firestore';
 import * as Location from 'expo-location';
 
 import { db } from '@/configs/FirebaseConfig';
+import { seedDatabase } from '@/utils/seedDatabase'; // Import the seed function
 
 // --- AUTUMN THEME ---
 const COLORS = {
@@ -21,12 +22,21 @@ const COLORS = {
   cardShadow: 'rgba(198, 124, 67, 0.15)'
 };
 
+const CATEGORIES = [
+  { id: 'All', label: 'All', icon: 'grid-outline' },
+  { id: 'Shop', label: 'Shops', icon: 'cart-outline' },
+  { id: 'Restaurant', label: 'Food', icon: 'fast-food-outline' },
+  { id: 'Hospital', label: 'Hospital', icon: 'medkit-outline' },
+  { id: 'Service', label: 'Services', icon: 'construct-outline' },
+];
+
 export default function HomeScreen() {
   const router = useRouter();
   const [shops, setShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [activeCategory, setActiveCategory] = useState('All');
 
   // 1. Fetch Location
   useEffect(() => {
@@ -40,10 +50,7 @@ export default function HomeScreen() {
 
   // 2. Fetch Shops Real-time
   useEffect(() => {
-    // Note: In Firestore, we should use simple queries. 
-    // We fetch all shops here and filter in memory for search/distance.
-    // Ensure you use the correct path: /artifacts/{appId}/public/data/shops
-    const appId = "default-app-id"; // Replace if you have a dynamic ID system
+    const appId = "default-app-id";
     const shopsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shops');
     
     const unsubscribe = onSnapshot(query(shopsRef), (snapshot) => {
@@ -58,10 +65,14 @@ export default function HomeScreen() {
     return () => unsubscribe();
   }, []);
 
-  const filteredShops = shops.filter(shop => 
-    shop.name_uz?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    shop.type?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter Logic
+  const filteredShops = shops.filter(shop => {
+    const matchesSearch = shop.name_uz?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          shop.type?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = activeCategory === 'All' || shop.type === activeCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <View style={styles.container}>
@@ -114,23 +125,37 @@ export default function HomeScreen() {
           />
         </TouchableOpacity>
 
-        {/* Categories */}
+        {/* Categories (Rounded Pill Design) */}
         <Text style={styles.sectionTitle}>Categories</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesList}>
-          {['All', 'Shop', 'Restaurant', 'Hospital', 'Service'].map((cat, index) => (
-            <TouchableOpacity 
-              key={cat} 
-              style={[
-                styles.categoryBtn, 
-                index === 0 ? { backgroundColor: COLORS.primary, borderColor: COLORS.primary } : {}
-              ]}
-            >
-              <Text style={[
-                styles.categoryText, 
-                index === 0 ? { color: COLORS.white } : {}
-              ]}>{cat}</Text>
-            </TouchableOpacity>
-          ))}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.categoriesList}
+        >
+          {CATEGORIES.map((cat) => {
+            const isActive = activeCategory === cat.id;
+            return (
+              <TouchableOpacity 
+                key={cat.id} 
+                style={[
+                  styles.categoryPill, 
+                  isActive ? styles.categoryPillActive : styles.categoryPillInactive
+                ]}
+                onPress={() => setActiveCategory(cat.id)}
+              >
+                <Ionicons 
+                  name={cat.icon as any} 
+                  size={18} 
+                  color={isActive ? COLORS.white : '#5D4037'} 
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[
+                  styles.categoryText, 
+                  isActive ? { color: COLORS.white } : { color: '#5D4037' }
+                ]}>{cat.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
         {/* Shop List */}
@@ -140,7 +165,7 @@ export default function HomeScreen() {
           <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 20}} />
         ) : (
           <View style={styles.gridContainer}>
-            {filteredShops.map((shop) => (
+            {filteredShops.length > 0 ? filteredShops.map((shop) => (
               <TouchableOpacity 
                 key={shop.id} 
                 style={styles.card}
@@ -161,7 +186,18 @@ export default function HomeScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
-            ))}
+            )) : (
+              <View style={{ alignItems: 'center', padding: 20 }}>
+                <Text style={{ color: '#888', marginBottom: 10 }}>No shops found.</Text>
+                {/* Temporary Seed Button */}
+                <TouchableOpacity 
+                  onPress={seedDatabase}
+                  style={{ backgroundColor: COLORS.secondary, padding: 10, borderRadius: 8 }}
+                >
+                  <Text style={{ color: 'white' }}>Generate Dummy Data</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -199,12 +235,26 @@ const styles = StyleSheet.create({
   bannerBtnText: { color: COLORS.white, fontSize: 12, fontWeight: 'bold' },
   bannerImage: { width: 120, height: '100%', resizeMode: 'cover' },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.dark, marginLeft: 20, marginBottom: 10 },
-  categoriesList: { paddingLeft: 20, marginBottom: 20 },
-  categoryBtn: {
-    paddingVertical: 8, paddingHorizontal: 20, borderRadius: 25,
-    marginRight: 10, backgroundColor: COLORS.white, borderWidth: 1, borderColor: '#E0E0E0'
+  
+  // New Categories Styles
+  categoriesList: { paddingLeft: 20, paddingRight: 20, marginBottom: 20 },
+  categoryPill: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 30, // Fully rounded
+    marginRight: 10, borderWidth: 1
   },
-  categoryText: { fontWeight: '600', color: COLORS.dark },
+  categoryPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  categoryPillInactive: {
+    backgroundColor: COLORS.white,
+    borderColor: '#E0E0E0', // Light grey border
+  },
+  categoryText: {
+    fontWeight: '600', fontSize: 14
+  },
+
   gridContainer: { paddingHorizontal: 20, paddingBottom: 20 },
   card: {
     backgroundColor: COLORS.white, borderRadius: 16, marginBottom: 15,
