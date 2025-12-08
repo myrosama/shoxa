@@ -1,8 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,71 +17,66 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          height: 65,
-          paddingBottom: 10,
-          paddingTop: 10,
+          position: 'absolute', 
+          bottom: 25, // Lifted up
+          left: 20, 
+          right: 20, // Floating with margins
+          height: 70,
+          borderRadius: 35, // Fully rounded ends
+          paddingBottom: 0, // Centered icons
+          paddingTop: 0,
           borderTopWidth: 0,
           elevation: 10,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-          backgroundColor: '#ffffff'
-        }
+          shadowOffset: { width: 0, height: 5 },
+          shadowOpacity: 0.15,
+          shadowRadius: 10,
+          backgroundColor: '#ffffff',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        tabBarShowLabel: false, // Cleaner look without labels (optional, based on photo)
       }}>
       
-      {/* 1. Amenities / Home */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "grid" : "grid-outline"} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons size={26} name={focused ? "grid" : "grid-outline"} color={color} />,
         }}
       />
-
-      {/* 2. Feed */}
       <Tabs.Screen
-        name="feed" // You will need to create app/(tabs)/feed.tsx later
+        name="feed"
         options={{
-          title: 'Feed',
-          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "newspaper" : "newspaper-outline"} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons size={26} name={focused ? "newspaper" : "newspaper-outline"} color={color} />,
         }}
       />
-
-      {/* 3. Map (Center, Bold) */}
       <Tabs.Screen
-        name="explore" // This maps to app/(tabs)/explore.tsx which is our Map view
+        name="explore"
         options={{
-          title: '', // No title for the center button
           tabBarIcon: ({ focused }) => (
             <View style={{
-              width: 56, height: 56, borderRadius: 28, 
+              width: 60, height: 60, borderRadius: 30, 
               backgroundColor: '#C67C43', 
               justifyContent: 'center', alignItems: 'center',
-              marginBottom: 20, // Push it up
-              shadowColor: '#C67C43', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, elevation: 5
+              marginBottom: 40, // Pop out effect
+              shadowColor: '#C67C43', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, elevation: 8,
+              borderWidth: 4, borderColor: '#FDF6E3' // Ring effect
             }}>
               <Ionicons name="map" size={28} color="white" />
             </View>
           ),
         }}
       />
-
-      {/* 4. Cart */}
       <Tabs.Screen
-        name="cart" // You will need to create app/(tabs)/cart.tsx later
+        name="cart"
         options={{
-          title: 'Cart',
-          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "cart" : "cart-outline"} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons size={26} name={focused ? "cart" : "cart-outline"} color={color} />,
         }}
       />
-
-      {/* 5. Profile */}
       <Tabs.Screen
-        name="profile" // You will need to create app/(tabs)/profile.tsx later
+        name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, focused }) => <Ionicons size={24} name={focused ? "person" : "person-outline"} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons size={26} name={focused ? "person" : "person-outline"} color={color} />,
         }}
       />
     </Tabs>
