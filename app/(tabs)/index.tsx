@@ -42,15 +42,23 @@ export default function HomeScreen() {
   // Animated scroll value
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Animation state - Search is ALWAYS sticky once scroll begins
+  // The CLIP LINE - where content "rolls over" behind (at Good Morning level)
+  const CLIP_LINE = insets.top + 55; // Just below status bar, at Good Morning text
+
+  // Content positions from top of scroll content
+  const LOCATION_BAR_TOP = 0;
+  const SEARCH_BAR_TOP = 60; // After location bar
+  const BANNER_TOP = SEARCH_BAR_TOP + 65;
+  const CATEGORIES_TOP = BANNER_TOP + 180; // After banner
+
+  // When scroll value causes element to reach clip line
+  const LOCATION_STICKY_SCROLL = 30; // Location rolls over first
+  const SEARCH_STICKY_SCROLL = 70; // Search becomes sticky
+  const CATEGORY_STICKY_SCROLL = 340; // Categories become sticky
+
+  // Sticky state
   const [showStickySearch, setShowStickySearch] = useState(false);
   const [showStickyCategories, setShowStickyCategories] = useState(false);
-  const stickyCategoryOpacity = useRef(new Animated.Value(0)).current;
-
-  // Threshold calculations
-  const LAYER_1_HEIGHT = insets.top + 70;
-  const LOCATION_BAR_ROLL_END = 40; // Location bar fully rolled over by 40px scroll
-  const CATEGORY_POSITION = 280; // When categories become sticky
 
   useEffect(() => {
     const unsubscribe = onSnapshot(query(collection(db, 'artifacts', 'default-app-id', 'public', 'data', 'shops')), (snapshot) => {
@@ -66,7 +74,7 @@ export default function HomeScreen() {
     setDirectionModalShop(shop);
   };
 
-  // Handle scroll - Search becomes sticky IMMEDIATELY on any scroll
+  // Handle scroll events
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     {
@@ -74,55 +82,59 @@ export default function HomeScreen() {
       listener: (event: any) => {
         const offsetY = event.nativeEvent.contentOffset.y;
 
-        // Search bar becomes sticky immediately on scroll
-        if (offsetY > 5 && !showStickySearch) {
+        // Search becomes sticky when it reaches the clip line
+        if (offsetY >= SEARCH_STICKY_SCROLL && !showStickySearch) {
           setShowStickySearch(true);
-        } else if (offsetY <= 5 && showStickySearch) {
+        } else if (offsetY < SEARCH_STICKY_SCROLL && showStickySearch) {
           setShowStickySearch(false);
         }
 
-        // Category sticky trigger
-        if (offsetY > CATEGORY_POSITION && !showStickyCategories) {
+        // Categories become sticky when they reach clip line
+        if (offsetY >= CATEGORY_STICKY_SCROLL && !showStickyCategories) {
           setShowStickyCategories(true);
-          Animated.timing(stickyCategoryOpacity, {
-            toValue: 1,
-            duration: 150,
-            useNativeDriver: true,
-          }).start();
-        } else if (offsetY <= CATEGORY_POSITION && showStickyCategories) {
-          Animated.timing(stickyCategoryOpacity, {
-            toValue: 0,
-            duration: 100,
-            useNativeDriver: true,
-          }).start(() => setShowStickyCategories(false));
+        } else if (offsetY < CATEGORY_STICKY_SCROLL && showStickyCategories) {
+          setShowStickyCategories(false);
         }
       }
     }
   );
 
-  // Cylinder roll animation for location bar - FAST roll (0 to 40px scroll)
+  // CYLINDER ROLL for location bar - rolls over as it reaches clip line
   const locationBarRotation = scrollY.interpolate({
-    inputRange: [0, LOCATION_BAR_ROLL_END],
-    outputRange: ['0deg', '-90deg'],
-    extrapolate: 'clamp',
-  });
-
-  const locationBarTranslateY = scrollY.interpolate({
-    inputRange: [0, LOCATION_BAR_ROLL_END],
-    outputRange: [0, -40],
+    inputRange: [0, LOCATION_STICKY_SCROLL - 10, LOCATION_STICKY_SCROLL],
+    outputRange: ['0deg', '-45deg', '-90deg'],
     extrapolate: 'clamp',
   });
 
   const locationBarOpacity = scrollY.interpolate({
-    inputRange: [0, LOCATION_BAR_ROLL_END * 0.5, LOCATION_BAR_ROLL_END],
-    outputRange: [1, 0.3, 0],
+    inputRange: [0, LOCATION_STICKY_SCROLL - 15, LOCATION_STICKY_SCROLL],
+    outputRange: [1, 0.5, 0],
     extrapolate: 'clamp',
   });
 
-  // In-flow categories opacity (fades when sticky appears)
-  const inFlowCategoryOpacity = scrollY.interpolate({
-    inputRange: [CATEGORY_POSITION - 30, CATEGORY_POSITION],
+  const locationBarScale = scrollY.interpolate({
+    inputRange: [0, LOCATION_STICKY_SCROLL],
+    outputRange: [1, 0.95],
+    extrapolate: 'clamp',
+  });
+
+  // Search bar - NO roll animation, just fades out when sticky appears
+  const inFlowSearchOpacity = scrollY.interpolate({
+    inputRange: [SEARCH_STICKY_SCROLL - 20, SEARCH_STICKY_SCROLL],
     outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  // Categories - CYLINDER ROLL as they reach clip line
+  const categoriesRotation = scrollY.interpolate({
+    inputRange: [CATEGORY_STICKY_SCROLL - 60, CATEGORY_STICKY_SCROLL - 20, CATEGORY_STICKY_SCROLL],
+    outputRange: ['0deg', '-45deg', '-90deg'],
+    extrapolate: 'clamp',
+  });
+
+  const categoriesOpacity = scrollY.interpolate({
+    inputRange: [CATEGORY_STICKY_SCROLL - 40, CATEGORY_STICKY_SCROLL - 10, CATEGORY_STICKY_SCROLL],
+    outputRange: [1, 0.5, 0],
     extrapolate: 'clamp',
   });
 
@@ -156,7 +168,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
           {showStickyCategories && (
-            <Animated.View style={[styles.stickyCategoriesContainer, { opacity: stickyCategoryOpacity }]}>
+            <View style={styles.stickyCategoriesContainer}>
               <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
                 {CATEGORIES.map((cat) => {
                   const isActive = activeCategory === cat.id;
@@ -172,7 +184,7 @@ export default function HomeScreen() {
                   );
                 })}
               </Animated.ScrollView>
-            </Animated.View>
+            </View>
           )}
         </Animated.View>
       )}
@@ -180,7 +192,7 @@ export default function HomeScreen() {
       {/* --- LAYER 2: SCROLLABLE CONTENT --- */}
       <Animated.ScrollView
         contentContainerStyle={{
-          paddingTop: LAYER_1_HEIGHT,
+          paddingTop: CLIP_LINE + 5,
           paddingBottom: 120
         }}
         showsVerticalScrollIndicator={false}
@@ -196,7 +208,7 @@ export default function HomeScreen() {
             transform: [
               { perspective: 1000 },
               { rotateX: locationBarRotation },
-              { translateY: locationBarTranslateY },
+              { scale: locationBarScale },
             ]
           }
         ]}>
@@ -212,13 +224,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Search Bar (in-flow, visible until sticky covers it) */}
-        <View style={styles.searchWrapper}>
+        {/* Search Bar (in-flow, fades when sticky appears) */}
+        <Animated.View style={[styles.searchWrapper, { opacity: inFlowSearchOpacity }]}>
           <Pressable onPress={() => router.push('/search')} style={styles.searchContainer}>
             <Ionicons name="search" size={20} color={COLORS.secondary} style={styles.searchIcon} />
             <Text style={styles.searchInputPlaceholder}>Search stores, medicine, food...</Text>
           </Pressable>
-        </View>
+        </Animated.View>
 
         {/* Banner */}
         <View style={styles.contentBackground}>
@@ -241,7 +253,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Category Pills (in-flow, fades out when sticky appears) */}
-        <Animated.View style={[styles.categoriesSection, { opacity: inFlowCategoryOpacity }]}>
+        <Animated.View style={[styles.categoriesSection, { opacity: categoriesOpacity, transform: [{ perspective: 800 }, { rotateX: categoriesRotation }] }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
             {CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.id;
