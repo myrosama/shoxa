@@ -292,15 +292,26 @@ export default function ShopDetails() {
               </Text>
             </View>
 
-            {/* Follow Button */}
-            <TouchableOpacity
-              style={[styles.followBtn, isFollowing && styles.followingBtn]}
-              onPress={toggleFollow}
-            >
-              <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
-                {isFollowing ? 'Following' : 'Follow'}
-              </Text>
-            </TouchableOpacity>
+            {/* Action Buttons Column */}
+            <View style={styles.actionButtons}>
+              {/* Follow Button */}
+              <TouchableOpacity
+                style={[styles.followBtn, isFollowing && styles.followingBtn]}
+                onPress={toggleFollow}
+              >
+                <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Location Button */}
+              <TouchableOpacity
+                style={styles.locationBtn}
+                onPress={() => setShowLocationModal(true)}
+              >
+                <Ionicons name="navigate" size={18} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Status Row */}
@@ -350,45 +361,71 @@ export default function ShopDetails() {
                 {products.length === 0 ? (
                   <Text style={styles.emptyText}>No products yet</Text>
                 ) : (
-                  products.map((item) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={styles.productCard}
-                      onPress={() => openProductView(item)}
-                      activeOpacity={0.9}
-                    >
-                      <View style={styles.productImageContainer}>
-                        <Image
-                          source={{ uri: item.imageUrl || 'https://via.placeholder.com/150?text=Product' }}
-                          style={styles.productImage}
-                        />
-                        {/* Add to Cart Button */}
-                        <TouchableOpacity
-                          style={styles.addToCartBtn}
-                          onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
-                        >
-                          {cart[item.id] > 0 ? (
-                            <Text style={styles.cartCountText}>{cart[item.id]}</Text>
-                          ) : (
-                            <Ionicons name="add" size={16} color={COLORS.white} />
+                  products.map((item) => {
+                    // Calculate discount percentage
+                    const hasDiscount = item.discountPrice && item.price && item.discountPrice < item.price;
+                    const discountPercent = hasDiscount
+                      ? Math.round((1 - item.discountPrice / item.price) * 100)
+                      : 0;
+
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.productCard}
+                        onPress={() => openProductView(item)}
+                        activeOpacity={0.95}
+                      >
+                        {/* Product Image */}
+                        <View style={styles.productImageContainer}>
+                          <Image
+                            source={{ uri: item.imageUrl || 'https://via.placeholder.com/150?text=Product' }}
+                            style={styles.productImage}
+                          />
+
+                          {/* Discount Badge */}
+                          {hasDiscount && (
+                            <View style={styles.discountBadge}>
+                              <Text style={styles.discountBadgeText}>-{discountPercent}%</Text>
+                            </View>
                           )}
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.productInfo}>
-                        <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-                        <View style={styles.priceRow}>
-                          {item.discountPrice ? (
+
+                          {/* Add to Cart Button */}
+                          <TouchableOpacity
+                            style={styles.addToCartBtn}
+                            onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
+                          >
+                            {cart[item.id] > 0 ? (
+                              <Text style={styles.cartCountText}>{cart[item.id]}</Text>
+                            ) : (
+                              <Ionicons name="add" size={24} color={COLORS.primary} />
+                            )}
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Product Info */}
+                        <View style={styles.productInfo}>
+                          {/* Price Section */}
+                          {hasDiscount ? (
                             <>
-                              <Text style={styles.originalPrice}>{item.price?.toLocaleString()}</Text>
-                              <Text style={styles.discountPrice}>{item.discountPrice?.toLocaleString()}</Text>
+                              <Text style={styles.discountPrice}>
+                                {item.discountPrice?.toLocaleString()} so'm
+                              </Text>
+                              <Text style={styles.originalPrice}>
+                                {item.price?.toLocaleString()} so'm
+                              </Text>
                             </>
                           ) : (
-                            <Text style={styles.productPrice}>{item.price?.toLocaleString()}</Text>
+                            <Text style={styles.productPrice}>
+                              {item.price?.toLocaleString()} so'm
+                            </Text>
                           )}
+
+                          {/* Product Name */}
+                          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  ))
+                      </TouchableOpacity>
+                    );
+                  })
                 )}
               </View>
             </>
@@ -686,6 +723,18 @@ const styles = StyleSheet.create({
   followingBtnText: {
     color: COLORS.primary,
   },
+  actionButtons: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  locationBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   // Status Row
   statusRow: {
@@ -795,62 +844,82 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: '#F8F8F8',
   },
   productImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#FFE500',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  discountBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.dark,
   },
   addToCartBtn: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
+    bottom: -20,
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
   cartCountText: {
-    color: COLORS.white,
-    fontSize: 14,
+    color: COLORS.primary,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   productInfo: {
     padding: 12,
+    paddingTop: 16,
+  },
+  productPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.dark,
+  },
+  discountPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  originalPrice: {
+    fontSize: 13,
+    color: COLORS.gray,
+    textDecorationLine: 'line-through',
+    marginTop: 2,
   },
   productName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
     color: COLORS.dark,
+    marginTop: 6,
+    lineHeight: 18,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 4,
-  },
-  productPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-  },
-  originalPrice: {
-    fontSize: 12,
-    color: COLORS.gray,
-    textDecorationLine: 'line-through',
-  },
-  discountPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.red,
   },
 
   // Posts Grid
