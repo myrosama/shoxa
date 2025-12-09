@@ -25,21 +25,7 @@ const COLORS = {
   storyGradient: ['#FF6B6B', '#FFE66D', '#4ECDC4', '#45B7D1', '#96E6A1'],
 };
 
-// Telegram Bot Token for image URLs  
-const TELEGRAM_BOT_TOKEN = '8471215089:AAHyG6JFoh2yn5jzKVmhz_IQrRkG0EpNqCY';
-
-const getTelegramImageUrl = async (fileId: string): Promise<string | null> => {
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`);
-    const data = await response.json();
-    if (data.ok) {
-      return `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${data.result.file_path}`;
-    }
-    return null;
-  } catch (error) {
-    return null;
-  }
-};
+import { getTelegramImageUrl } from '@/configs/AppConfig';
 
 // Get open/closed status
 const getOpenStatus = (openingHours: any): { isOpen: boolean; statusText: string; statusColor: string } => {

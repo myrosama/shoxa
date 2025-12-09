@@ -21,23 +21,7 @@ const COLORS = {
   yellow: '#FFD700'
 };
 
-// Telegram Bot Token for image URLs
-const TELEGRAM_BOT_TOKEN = '8471215089:AAHyG6JFoh2yn5jzKVmhz_IQrRkG0EpNqCY';
-
-// Helper to get Telegram image URL
-const getTelegramImageUrl = async (fileId: string): Promise<string | null> => {
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`);
-    const data = await response.json();
-    if (data.ok) {
-      return `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${data.result.file_path}`;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting Telegram image URL:', error);
-    return null;
-  }
-};
+import { getTelegramImageUrl } from '@/configs/AppConfig';
 
 const CATEGORIES = [
   { id: 'All', label: 'All', icon: 'grid-outline' },
