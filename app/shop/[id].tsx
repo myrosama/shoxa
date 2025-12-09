@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, Image, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Dimensions, Animated, Linking, Platform
+  ActivityIndicator, Dimensions, Animated, Linking, Platform, Alert
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { doc, getDoc, collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db } from '@/configs/FirebaseConfig';
@@ -20,6 +20,8 @@ const COLORS = {
   gray: '#888888',
   lightGray: '#F5F5F5',
   white: '#FFFFFF',
+  green: '#4CAF50',
+  red: '#E53935',
   storyGradient: ['#FF6B6B', '#FFE66D', '#4ECDC4', '#45B7D1', '#96E6A1'],
 };
 
@@ -39,6 +41,45 @@ const getTelegramImageUrl = async (fileId: string): Promise<string | null> => {
   }
 };
 
+// Get open/closed status
+const getOpenStatus = (openingHours: any): { isOpen: boolean; statusText: string; statusColor: string } => {
+  if (!openingHours) return { isOpen: false, statusText: 'Hours not set', statusColor: COLORS.gray };
+
+  const now = new Date();
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const today = days[now.getDay()];
+  const currentTime = now.getHours() * 60 + now.getMinutes(); // minutes since midnight
+
+  const todayHours = openingHours[today];
+  if (!todayHours || !todayHours.open || !todayHours.close) {
+    return { isOpen: false, statusText: 'Closed today', statusColor: COLORS.red };
+  }
+
+  const [openHour, openMin] = todayHours.open.split(':').map(Number);
+  const [closeHour, closeMin] = todayHours.close.split(':').map(Number);
+  const openTime = openHour * 60 + openMin;
+  const closeTime = closeHour * 60 + closeMin;
+
+  if (currentTime >= openTime && currentTime < closeTime) {
+    const minsUntilClose = closeTime - currentTime;
+    if (minsUntilClose <= 60) {
+      return { isOpen: true, statusText: `Closes in ${minsUntilClose}min`, statusColor: '#FF9800' };
+    }
+    return { isOpen: true, statusText: `Open · Closes ${todayHours.close}`, statusColor: COLORS.green };
+  } else if (currentTime < openTime) {
+    return { isOpen: false, statusText: `Closed · Opens ${todayHours.open}`, statusColor: COLORS.red };
+  } else {
+    // Find next open day
+    for (let i = 1; i <= 7; i++) {
+      const nextDay = days[(now.getDay() + i) % 7];
+      if (openingHours[nextDay]?.open) {
+        return { isOpen: false, statusText: `Closed · Opens ${nextDay.charAt(0).toUpperCase() + nextDay.slice(1)}`, statusColor: COLORS.red };
+      }
+    }
+    return { isOpen: false, statusText: 'Closed', statusColor: COLORS.red };
+  }
+};
+
 type TabType = 'products' | 'posts' | 'contacts' | 'about';
 
 export default function ShopDetails() {
@@ -53,6 +94,9 @@ export default function ShopDetails() {
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [hasStory, setHasStory] = useState(false);
   const [hasNewPosts, setHasNewPosts] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [cart, setCart] = useState<{ [key: string]: number }>({});
+  const [openStatus, setOpenStatus] = useState({ isOpen: false, statusText: '', statusColor: COLORS.gray });
 
   const storyPulse = useRef(new Animated.Value(1)).current;
 
@@ -74,15 +118,14 @@ export default function ShopDetails() {
 
   const fetchShopData = async () => {
     try {
-      // Fetch shop data
       const shopRef = doc(db, 'shops', id as string);
       const shopSnap = await getDoc(shopRef);
 
       if (shopSnap.exists()) {
         const shopData = { id: shopSnap.id, ...shopSnap.data() };
         setShop(shopData);
+        setOpenStatus(getOpenStatus(shopData.openingHours));
 
-        // Get images from Telegram
         if (shopData.logoFileId) {
           const url = await getTelegramImageUrl(shopData.logoFileId);
           setLogoUrl(url);
@@ -122,7 +165,6 @@ export default function ShopDetails() {
         );
         setPosts(postsList);
 
-        // Check for recent posts (< 24 hours = has story)
         const now = Date.now();
         const recentPosts = postsList.filter((p: any) => {
           const createdAt = p.createdAt?.toDate?.()?.getTime() || 0;
@@ -145,6 +187,38 @@ export default function ShopDetails() {
       android: `geo:${shop.location.lat},${shop.location.lng}?q=${shop.location.lat},${shop.location.lng}`,
     });
     if (url) Linking.openURL(url);
+  };
+
+  const toggleFollow = () => {
+    setIsFollowing(!isFollowing);
+    // TODO: Save to Firebase
+  };
+
+  const addToCart = (productId: string) => {
+    setCart(prev => ({
+      ...prev,
+      [productId]: (prev[productId] || 0) + 1
+    }));
+  };
+
+  const getCartTotal = () => {
+    return Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+  };
+
+  const getCartTotalPrice = () => {
+    return products.reduce((sum, p) => {
+      const qty = cart[p.id] || 0;
+      const price = p.discountPrice || p.price || 0;
+      return sum + (qty * price);
+    }, 0);
+  };
+
+  const openProductView = (product: any) => {
+    // Navigate to product detail view
+    router.push({
+      pathname: '/product/[id]',
+      params: { id: product.id, shopId: id as string }
+    });
   };
 
   const TABS: { key: TabType; label: string; icon: string }[] = [
@@ -185,7 +259,7 @@ export default function ShopDetails() {
             style={styles.bannerImage}
           />
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.7)']}
+            colors={['transparent', 'rgba(0,0,0,0.8)']}
             style={styles.bannerGradient}
           />
 
@@ -198,6 +272,12 @@ export default function ShopDetails() {
           <TouchableOpacity style={styles.headerShareBtn}>
             <Ionicons name="share-outline" size={22} color={COLORS.white} />
           </TouchableOpacity>
+
+          {/* Shop Name on Banner */}
+          <View style={styles.bannerInfo}>
+            <Text style={styles.bannerShopName}>{shop.name || 'Unnamed Shop'}</Text>
+            <Text style={styles.bannerShopType}>{shop.type || 'Shop'}</Text>
+          </View>
         </View>
 
         {/* Profile Section */}
@@ -220,17 +300,8 @@ export default function ShopDetails() {
             </View>
           </Animated.View>
 
-          {/* Shop Info */}
-          <View style={styles.shopInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.shopName}>{shop.name || 'Unnamed Shop'}</Text>
-              {shop.isVerified && (
-                <Ionicons name="checkmark-circle" size={20} color="#1DA1F2" style={{ marginLeft: 6 }} />
-              )}
-            </View>
-            <Text style={styles.shopType}>{shop.type || 'Shop'}</Text>
-
-            {/* Stats Row */}
+          {/* Stats & Follow Button */}
+          <View style={styles.statsAndFollow}>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{products.length}</Text>
@@ -245,7 +316,30 @@ export default function ShopDetails() {
                 <Text style={styles.statLabel}>Rating</Text>
               </View>
             </View>
+
+            {/* Follow Button */}
+            <TouchableOpacity
+              style={[styles.followBtn, isFollowing && styles.followingBtn]}
+              onPress={toggleFollow}
+            >
+              <Ionicons
+                name={isFollowing ? 'checkmark' : 'add'}
+                size={18}
+                color={isFollowing ? COLORS.primary : COLORS.white}
+              />
+              <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
+                {isFollowing ? 'Following' : 'Follow'}
+              </Text>
+            </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Open/Closed Status */}
+        <View style={styles.statusBar}>
+          <View style={[styles.statusDot, { backgroundColor: openStatus.statusColor }]} />
+          <Text style={[styles.statusText, { color: openStatus.statusColor }]}>
+            {openStatus.statusText}
+          </Text>
         </View>
 
         {/* Location Bar */}
@@ -291,11 +385,27 @@ export default function ShopDetails() {
                 <Text style={styles.emptyText}>No products yet</Text>
               ) : (
                 products.map((item) => (
-                  <TouchableOpacity key={item.id} style={styles.productCard}>
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.productCard}
+                    onPress={() => openProductView(item)}
+                  >
                     <Image
                       source={{ uri: item.imageUrl || 'https://via.placeholder.com/150?text=Product' }}
                       style={styles.productImage}
                     />
+                    {/* Add to Cart Button */}
+                    <TouchableOpacity
+                      style={styles.addToCartBtn}
+                      onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
+                    >
+                      <Ionicons name="add" size={20} color={COLORS.white} />
+                    </TouchableOpacity>
+                    {cart[item.id] > 0 && (
+                      <View style={styles.cartBadge}>
+                        <Text style={styles.cartBadgeText}>{cart[item.id]}</Text>
+                      </View>
+                    )}
                     <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
                     <View style={styles.priceRow}>
                       {item.discountPrice ? (
@@ -392,6 +502,18 @@ export default function ShopDetails() {
           )}
         </View>
       </ScrollView>
+
+      {/* Floating Cart Button */}
+      {getCartTotal() > 0 && (
+        <TouchableOpacity style={styles.floatingCart}>
+          <Ionicons name="cart" size={24} color={COLORS.white} />
+          <View style={styles.floatingCartBadge}>
+            <Text style={styles.floatingCartBadgeText}>{getCartTotal()}</Text>
+          </View>
+          <Text style={styles.floatingCartText}>{getCartTotalPrice().toLocaleString()} UZS</Text>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.white} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -425,7 +547,7 @@ const styles = StyleSheet.create({
 
   // Banner
   bannerSection: {
-    height: 200,
+    height: 220,
     position: 'relative',
   },
   bannerImage: {
@@ -438,7 +560,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 100,
+    height: 150,
   },
   headerBackBtn: {
     position: 'absolute',
@@ -462,11 +584,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  bannerInfo: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+  },
+  bannerShopName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.white,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  bannerShopType: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    textTransform: 'capitalize',
+    marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
 
   // Profile Section
   profileSection: {
-    marginTop: -50,
-    paddingHorizontal: 20,
+    marginTop: -40,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
@@ -482,9 +627,9 @@ const styles = StyleSheet.create({
     borderRadius: 54,
   },
   avatarBorder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: COLORS.white,
     padding: 3,
   },
@@ -494,32 +639,17 @@ const styles = StyleSheet.create({
   avatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 50,
+    borderRadius: 45,
   },
-  shopInfo: {
+  statsAndFollow: {
     flex: 1,
     marginLeft: 16,
-    paddingBottom: 10,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  shopName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.dark,
-  },
-  shopType: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginTop: 2,
-    textTransform: 'capitalize',
+    paddingBottom: 8,
   },
   statsRow: {
     flexDirection: 'row',
-    marginTop: 12,
-    gap: 20,
+    gap: 16,
+    marginBottom: 10,
   },
   statItem: {
     alignItems: 'center',
@@ -530,8 +660,51 @@ const styles = StyleSheet.create({
     color: COLORS.dark,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.gray,
+  },
+
+  // Follow Button
+  followBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 4,
+  },
+  followingBtn: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  followBtnText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  followingBtnText: {
+    color: COLORS.primary,
+  },
+
+  // Status Bar
+  statusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 
   // Location Bar
@@ -540,7 +713,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.white,
     marginHorizontal: 16,
-    marginTop: 16,
     padding: 12,
     borderRadius: 12,
     shadowColor: '#000',
@@ -572,7 +744,7 @@ const styles = StyleSheet.create({
   // Tab Bar
   tabBar: {
     flexDirection: 'row',
-    marginTop: 20,
+    marginTop: 16,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: '#E5E5E5',
@@ -630,11 +802,44 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    position: 'relative',
   },
   productImage: {
     width: '100%',
     height: 120,
     resizeMode: 'cover',
+  },
+  addToCartBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.red,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cartBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   productName: {
     fontSize: 14,
@@ -663,7 +868,7 @@ const styles = StyleSheet.create({
   discountPrice: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#E53935',
+    color: COLORS.red,
   },
 
   // Posts Grid
@@ -750,5 +955,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.dark,
     fontWeight: '500',
+  },
+
+  // Floating Cart
+  floatingCart: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingHorizontal: 20,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  floatingCartBadge: {
+    backgroundColor: COLORS.red,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: -4,
+    marginRight: 8,
+  },
+  floatingCartBadgeText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  floatingCartText: {
+    flex: 1,
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
