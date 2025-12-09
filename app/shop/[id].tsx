@@ -8,6 +8,7 @@ import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db } from '@/configs/FirebaseConfig';
+import { getTelegramImageUrl } from '@/configs/AppConfig';
 
 const { width } = Dimensions.get('window');
 
@@ -22,10 +23,9 @@ const COLORS = {
   white: '#FFFFFF',
   green: '#4CAF50',
   red: '#E53935',
-  storyGradient: ['#FF6B6B', '#FFE66D', '#4ECDC4', '#45B7D1', '#96E6A1'],
+  cream: '#FFF8F0',
+  storyGradient: ['#FF6B6B', '#FFE66D', '#4ECDC4', '#45B7D1', '#96E6A1'] as const,
 };
-
-import { getTelegramImageUrl } from '@/configs/AppConfig';
 
 // Get open/closed status
 const getOpenStatus = (openingHours: any): { isOpen: boolean; statusText: string; statusColor: string } => {
@@ -34,7 +34,7 @@ const getOpenStatus = (openingHours: any): { isOpen: boolean; statusText: string
   const now = new Date();
   const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const today = days[now.getDay()];
-  const currentTime = now.getHours() * 60 + now.getMinutes(); // minutes since midnight
+  const currentTime = now.getHours() * 60 + now.getMinutes();
 
   const todayHours = openingHours[today];
   if (!todayHours || !todayHours.open || !todayHours.close) {
@@ -47,21 +47,11 @@ const getOpenStatus = (openingHours: any): { isOpen: boolean; statusText: string
   const closeTime = closeHour * 60 + closeMin;
 
   if (currentTime >= openTime && currentTime < closeTime) {
-    const minsUntilClose = closeTime - currentTime;
-    if (minsUntilClose <= 60) {
-      return { isOpen: true, statusText: `Closes in ${minsUntilClose}min`, statusColor: '#FF9800' };
-    }
-    return { isOpen: true, statusText: `Open · Closes ${todayHours.close}`, statusColor: COLORS.green };
+    const closeHourFormatted = closeHour > 12 ? `${closeHour - 12} PM` : `${closeHour} AM`;
+    return { isOpen: true, statusText: `Open until ${closeHourFormatted}`, statusColor: COLORS.green };
   } else if (currentTime < openTime) {
-    return { isOpen: false, statusText: `Closed · Opens ${todayHours.open}`, statusColor: COLORS.red };
+    return { isOpen: false, statusText: `Opens ${todayHours.open}`, statusColor: COLORS.red };
   } else {
-    // Find next open day
-    for (let i = 1; i <= 7; i++) {
-      const nextDay = days[(now.getDay() + i) % 7];
-      if (openingHours[nextDay]?.open) {
-        return { isOpen: false, statusText: `Closed · Opens ${nextDay.charAt(0).toUpperCase() + nextDay.slice(1)}`, statusColor: COLORS.red };
-      }
-    }
     return { isOpen: false, statusText: 'Closed', statusColor: COLORS.red };
   }
 };
@@ -81,6 +71,7 @@ export default function ShopDetails() {
   const [hasStory, setHasStory] = useState(false);
   const [hasNewPosts, setHasNewPosts] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [cart, setCart] = useState<{ [key: string]: number }>({});
   const [openStatus, setOpenStatus] = useState({ isOpen: false, statusText: '', statusColor: COLORS.gray });
 
@@ -177,14 +168,18 @@ export default function ShopDetails() {
 
   const toggleFollow = () => {
     setIsFollowing(!isFollowing);
-    // TODO: Save to Firebase
   };
 
-  const addToCart = (productId: string) => {
+  const toggleFavorite = () => {
+    setIsFavorite(!isFavorite);
+  };
+
+  const addToCart = (productId: string, productName: string) => {
     setCart(prev => ({
       ...prev,
       [productId]: (prev[productId] || 0) + 1
     }));
+    // Optional: Show quick feedback
   };
 
   const getCartTotal = () => {
@@ -200,7 +195,6 @@ export default function ShopDetails() {
   };
 
   const openProductView = (product: any) => {
-    // Navigate to product detail view
     router.push({
       pathname: '/product/[id]',
       params: { id: product.id, shopId: id as string }
@@ -237,16 +231,12 @@ export default function ShopDetails() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
         {/* Banner Section */}
         <View style={styles.bannerSection}>
           <Image
             source={{ uri: bannerUrl || 'https://via.placeholder.com/600x300?text=No+Banner' }}
             style={styles.bannerImage}
-          />
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.8)']}
-            style={styles.bannerGradient}
           />
 
           {/* Back Button */}
@@ -254,53 +244,44 @@ export default function ShopDetails() {
             <Ionicons name="arrow-back" size={22} color={COLORS.white} />
           </TouchableOpacity>
 
-          {/* Share Button */}
-          <TouchableOpacity style={styles.headerShareBtn}>
-            <Ionicons name="share-outline" size={22} color={COLORS.white} />
+          {/* Favorite Button */}
+          <TouchableOpacity style={styles.headerFavoriteBtn} onPress={toggleFavorite}>
+            <Ionicons
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size={22}
+              color={isFavorite ? COLORS.red : COLORS.white}
+            />
           </TouchableOpacity>
-
-          {/* Shop Name on Banner */}
-          <View style={styles.bannerInfo}>
-            <Text style={styles.bannerShopName}>{shop.name || 'Unnamed Shop'}</Text>
-            <Text style={styles.bannerShopType}>{shop.type || 'Shop'}</Text>
-          </View>
         </View>
 
-        {/* Profile Section */}
-        <View style={styles.profileSection}>
-          {/* Avatar with Story Glow */}
-          <Animated.View style={[styles.avatarContainer, { transform: [{ scale: storyPulse }] }]}>
-            {hasStory && (
-              <LinearGradient
-                colors={COLORS.storyGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.storyRing}
-              />
-            )}
-            <View style={[styles.avatarBorder, hasStory && styles.avatarBorderStory]}>
-              <Image
-                source={{ uri: logoUrl || 'https://via.placeholder.com/100?text=Logo' }}
-                style={styles.avatar}
-              />
-            </View>
-          </Animated.View>
+        {/* Floating Info Card */}
+        <View style={styles.infoCard}>
+          {/* Logo & Name Row */}
+          <View style={styles.infoCardTop}>
+            {/* Logo with Story Glow */}
+            <Animated.View style={[styles.logoContainer, { transform: [{ scale: storyPulse }] }]}>
+              {hasStory && (
+                <LinearGradient
+                  colors={COLORS.storyGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.storyRing}
+                />
+              )}
+              <View style={[styles.logoBorder, hasStory && styles.logoBorderStory]}>
+                <Image
+                  source={{ uri: logoUrl || 'https://via.placeholder.com/100?text=Logo' }}
+                  style={styles.logo}
+                />
+              </View>
+            </Animated.View>
 
-          {/* Stats & Follow Button */}
-          <View style={styles.statsAndFollow}>
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{products.length}</Text>
-                <Text style={styles.statLabel}>Products</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{posts.length}</Text>
-                <Text style={styles.statLabel}>Posts</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{shop.rating?.toFixed(1) || '4.5'}</Text>
-                <Text style={styles.statLabel}>Rating</Text>
-              </View>
+            {/* Shop Name */}
+            <View style={styles.shopNameContainer}>
+              <Text style={styles.shopName}>{shop.name || 'Unnamed Shop'}</Text>
+              {shop.isVerified && (
+                <Ionicons name="checkmark-circle" size={18} color="#1DA1F2" style={{ marginLeft: 4 }} />
+              )}
             </View>
 
             {/* Follow Button */}
@@ -308,37 +289,28 @@ export default function ShopDetails() {
               style={[styles.followBtn, isFollowing && styles.followingBtn]}
               onPress={toggleFollow}
             >
-              <Ionicons
-                name={isFollowing ? 'checkmark' : 'add'}
-                size={18}
-                color={isFollowing ? COLORS.primary : COLORS.white}
-              />
               <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
                 {isFollowing ? 'Following' : 'Follow'}
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Open/Closed Status */}
-        <View style={styles.statusBar}>
-          <View style={[styles.statusDot, { backgroundColor: openStatus.statusColor }]} />
-          <Text style={[styles.statusText, { color: openStatus.statusColor }]}>
-            {openStatus.statusText}
-          </Text>
-        </View>
+          {/* Status Row */}
+          <View style={styles.statusRow}>
+            {/* Open Status */}
+            <View style={styles.statusItem}>
+              <View style={[styles.statusDot, { backgroundColor: openStatus.statusColor }]} />
+              <Text style={[styles.statusText, { color: openStatus.statusColor }]}>
+                {openStatus.statusText}
+              </Text>
+            </View>
 
-        {/* Location Bar */}
-        <View style={styles.locationBar}>
-          <View style={styles.locationInfo}>
-            <Ionicons name="location-sharp" size={18} color={COLORS.primary} />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {shop.location?.address || 'Location not set'}
-            </Text>
+            {/* Location with tap to navigate */}
+            <TouchableOpacity style={styles.statusItem} onPress={openMaps}>
+              <Ionicons name="location" size={16} color={COLORS.gray} />
+              <Text style={styles.distanceText}>1.2 km</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.navigateBtn} onPress={openMaps}>
-            <Ionicons name="navigate" size={18} color={COLORS.white} />
-          </TouchableOpacity>
         </View>
 
         {/* Tab Navigation */}
@@ -349,11 +321,9 @@ export default function ShopDetails() {
               style={[styles.tabItem, activeTab === tab.key && styles.tabItemActive]}
               onPress={() => setActiveTab(tab.key)}
             >
-              <Ionicons
-                name={tab.icon as any}
-                size={22}
-                color={activeTab === tab.key ? COLORS.primary : COLORS.gray}
-              />
+              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+                {tab.label}
+              </Text>
               {tab.key === 'posts' && hasNewPosts && (
                 <View style={styles.newBadge}>
                   <Text style={styles.newBadgeText}>NEW</Text>
@@ -366,47 +336,52 @@ export default function ShopDetails() {
         {/* Tab Content */}
         <View style={styles.tabContent}>
           {activeTab === 'products' && (
-            <View style={styles.productsGrid}>
-              {products.length === 0 ? (
-                <Text style={styles.emptyText}>No products yet</Text>
-              ) : (
-                products.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.productCard}
-                    onPress={() => openProductView(item)}
-                  >
-                    <Image
-                      source={{ uri: item.imageUrl || 'https://via.placeholder.com/150?text=Product' }}
-                      style={styles.productImage}
-                    />
-                    {/* Add to Cart Button */}
+            <>
+              <Text style={styles.sectionTitle}>Available Products</Text>
+              <View style={styles.productsGrid}>
+                {products.length === 0 ? (
+                  <Text style={styles.emptyText}>No products yet</Text>
+                ) : (
+                  products.map((item) => (
                     <TouchableOpacity
-                      style={styles.addToCartBtn}
-                      onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
+                      key={item.id}
+                      style={styles.productCard}
+                      onPress={() => openProductView(item)}
                     >
-                      <Ionicons name="add" size={20} color={COLORS.white} />
-                    </TouchableOpacity>
-                    {cart[item.id] > 0 && (
-                      <View style={styles.cartBadge}>
-                        <Text style={styles.cartBadgeText}>{cart[item.id]}</Text>
+                      <View style={styles.productImageContainer}>
+                        <Image
+                          source={{ uri: item.imageUrl || 'https://via.placeholder.com/150?text=Product' }}
+                          style={styles.productImage}
+                        />
+                        {/* Add to Cart Button */}
+                        <TouchableOpacity
+                          style={styles.addToCartBtn}
+                          onPress={(e) => { e.stopPropagation(); addToCart(item.id, item.name); }}
+                        >
+                          <Ionicons name="add" size={18} color={COLORS.white} />
+                        </TouchableOpacity>
+                        {cart[item.id] > 0 && (
+                          <View style={styles.cartBadge}>
+                            <Text style={styles.cartBadgeText}>{cart[item.id]}</Text>
+                          </View>
+                        )}
                       </View>
-                    )}
-                    <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-                    <View style={styles.priceRow}>
-                      {item.discountPrice ? (
-                        <>
-                          <Text style={styles.originalPrice}>{item.price?.toLocaleString()}</Text>
-                          <Text style={styles.discountPrice}>{item.discountPrice?.toLocaleString()} UZS</Text>
-                        </>
-                      ) : (
-                        <Text style={styles.productPrice}>{item.price?.toLocaleString()} UZS</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))
-              )}
-            </View>
+                      <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+                      <View style={styles.priceRow}>
+                        {item.discountPrice ? (
+                          <>
+                            <Text style={styles.originalPrice}>{item.price?.toLocaleString()}</Text>
+                            <Text style={styles.discountPrice}>{item.discountPrice?.toLocaleString()}</Text>
+                          </>
+                        ) : (
+                          <Text style={styles.productPrice}>{item.price?.toLocaleString()} UZS</Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            </>
           )}
 
           {activeTab === 'posts' && (
@@ -484,6 +459,15 @@ export default function ShopDetails() {
                   </View>
                 ))}
               </View>
+
+              {/* Location Card */}
+              <TouchableOpacity style={styles.aboutCard} onPress={openMaps}>
+                <Text style={styles.aboutTitle}>Location</Text>
+                <View style={styles.locationRow}>
+                  <Ionicons name="location" size={20} color={COLORS.primary} />
+                  <Text style={styles.locationAddressText}>{shop.location?.address || 'Tap to navigate'}</Text>
+                </View>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -541,13 +525,6 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
-  bannerGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 150,
-  },
   headerBackBtn: {
     position: 'absolute',
     top: 50,
@@ -555,115 +532,86 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerShareBtn: {
+  headerFavoriteBtn: {
     position: 'absolute',
     top: 50,
     right: 16,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bannerInfo: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-  },
-  bannerShopName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  bannerShopType: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    textTransform: 'capitalize',
-    marginTop: 2,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
 
-  // Profile Section
-  profileSection: {
+  // Floating Info Card
+  infoCard: {
+    backgroundColor: COLORS.cream,
+    marginHorizontal: 16,
     marginTop: -40,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
-  avatarContainer: {
+  infoCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoContainer: {
     position: 'relative',
   },
   storyRing: {
     position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderRadius: 54,
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 35,
   },
-  avatarBorder: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+  logoBorder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: COLORS.white,
+    padding: 2,
+  },
+  logoBorderStory: {
     padding: 3,
   },
-  avatarBorderStory: {
-    padding: 4,
-  },
-  avatar: {
+  logo: {
     width: '100%',
     height: '100%',
-    borderRadius: 45,
+    borderRadius: 30,
   },
-  statsAndFollow: {
+  shopNameContainer: {
     flex: 1,
-    marginLeft: 16,
-    paddingBottom: 8,
-  },
-  statsRow: {
+    marginLeft: 12,
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 10,
-  },
-  statItem: {
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
-  statValue: {
-    fontSize: 18,
+  shopName: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.dark,
   },
-  statLabel: {
-    fontSize: 11,
-    color: COLORS.gray,
-  },
-
-  // Follow Button
   followBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: COLORS.primary,
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 4,
+    paddingHorizontal: 20,
+    borderRadius: 20,
   },
   followingBtn: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
     borderColor: COLORS.primary,
   },
   followBtnText: {
@@ -675,13 +623,17 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
 
-  // Status Bar
-  statusBar: {
+  // Status Row
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 6,
+    marginTop: 12,
+    gap: 16,
+  },
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   statusDot: {
     width: 8,
@@ -692,71 +644,50 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-
-  // Location Bar
-  locationBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
-    padding: 12,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  locationInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationText: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 14,
-    color: COLORS.dark,
-  },
-  navigateBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+  distanceText: {
+    fontSize: 13,
+    color: COLORS.gray,
   },
 
   // Tab Bar
   tabBar: {
     flexDirection: 'row',
     marginTop: 16,
-    borderTopWidth: 1,
+    marginHorizontal: 16,
     borderBottomWidth: 1,
-    borderColor: '#E5E5E5',
+    borderBottomColor: '#E5E5E5',
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     position: 'relative',
   },
   tabItemActive: {
     borderBottomWidth: 2,
     borderBottomColor: COLORS.primary,
   },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.gray,
+  },
+  tabTextActive: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
   newBadge: {
     position: 'absolute',
-    top: 8,
-    right: '25%',
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    top: 6,
+    right: 8,
+    backgroundColor: COLORS.red,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
     borderRadius: 4,
   },
   newBadgeText: {
     color: COLORS.white,
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: 'bold',
   },
 
@@ -765,6 +696,12 @@ const styles = StyleSheet.create({
     minHeight: 300,
     padding: 16,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.dark,
+    marginBottom: 16,
+  },
   emptyText: {
     textAlign: 'center',
     color: COLORS.gray,
@@ -772,49 +709,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // Products Grid
+  // Products Grid - 3 columns
   productsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
   productCard: {
-    width: (width - 44) / 2,
+    width: (width - 52) / 3,
     backgroundColor: COLORS.white,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+  },
+  productImageContainer: {
     position: 'relative',
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   productImage: {
     width: '100%',
-    height: 120,
+    height: '100%',
     resizeMode: 'cover',
   },
   addToCartBtn: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: 6,
+    right: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowRadius: 3,
+    elevation: 3,
   },
   cartBadge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: 6,
+    right: 6,
     width: 18,
     height: 18,
     borderRadius: 9,
@@ -828,31 +767,30 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   productName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '500',
     color: COLORS.dark,
-    padding: 10,
-    paddingBottom: 4,
+    marginTop: 6,
+    lineHeight: 16,
   },
   priceRow: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    marginTop: 2,
   },
   productPrice: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
     color: COLORS.primary,
   },
   originalPrice: {
-    fontSize: 12,
+    fontSize: 10,
     color: COLORS.gray,
     textDecorationLine: 'line-through',
   },
   discountPrice: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
     color: COLORS.red,
   },
@@ -941,6 +879,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.dark,
     fontWeight: '500',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  locationAddressText: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.dark,
   },
 
   // Floating Cart
