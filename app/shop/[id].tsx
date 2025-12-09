@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, Image, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Dimensions, Animated, Linking, Platform, Alert
+  ActivityIndicator, Dimensions, Animated, Linking, Platform, Modal, Share
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { db } from '@/configs/FirebaseConfig';
 import { getTelegramImageUrl } from '@/configs/AppConfig';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const COLORS = {
   background: '#FDF6E3',
@@ -56,7 +56,7 @@ const getOpenStatus = (openingHours: any): { isOpen: boolean; statusText: string
   }
 };
 
-type TabType = 'products' | 'posts' | 'contacts' | 'about';
+type TabType = 'products' | 'posts' | 'info';
 
 export default function ShopDetails() {
   const { id } = useLocalSearchParams();
@@ -71,9 +71,9 @@ export default function ShopDetails() {
   const [hasStory, setHasStory] = useState(false);
   const [hasNewPosts, setHasNewPosts] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [cart, setCart] = useState<{ [key: string]: number }>({});
   const [openStatus, setOpenStatus] = useState({ isOpen: false, statusText: '', statusColor: COLORS.gray });
+  const [showLocationModal, setShowLocationModal] = useState(false);
 
   const storyPulse = useRef(new Animated.Value(1)).current;
 
@@ -164,22 +164,29 @@ export default function ShopDetails() {
       android: `geo:${shop.location.lat},${shop.location.lng}?q=${shop.location.lat},${shop.location.lng}`,
     });
     if (url) Linking.openURL(url);
+    setShowLocationModal(false);
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out ${shop?.name} on SHOXA!\n\n${shop?.location?.address || ''}\n\nhttps://shoxa.uz/shop/${id}`,
+        title: shop?.name,
+      });
+    } catch (error) {
+      console.error('Share error:', error);
+    }
   };
 
   const toggleFollow = () => {
     setIsFollowing(!isFollowing);
   };
 
-  const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
-  };
-
-  const addToCart = (productId: string, productName: string) => {
+  const addToCart = (productId: string) => {
     setCart(prev => ({
       ...prev,
       [productId]: (prev[productId] || 0) + 1
     }));
-    // Optional: Show quick feedback
   };
 
   const getCartTotal = () => {
@@ -201,11 +208,10 @@ export default function ShopDetails() {
     });
   };
 
-  const TABS: { key: TabType; label: string; icon: string }[] = [
-    { key: 'products', label: 'Products', icon: 'grid-outline' },
-    { key: 'posts', label: 'Posts', icon: 'images-outline' },
-    { key: 'contacts', label: 'Contacts', icon: 'call-outline' },
-    { key: 'about', label: 'About', icon: 'information-circle-outline' },
+  const TABS: { key: TabType; label: string }[] = [
+    { key: 'products', label: 'Products' },
+    { key: 'posts', label: 'Posts' },
+    { key: 'info', label: 'Info' },
   ];
 
   if (loading) {
@@ -244,13 +250,9 @@ export default function ShopDetails() {
             <Ionicons name="arrow-back" size={22} color={COLORS.white} />
           </TouchableOpacity>
 
-          {/* Favorite Button */}
-          <TouchableOpacity style={styles.headerFavoriteBtn} onPress={toggleFavorite}>
-            <Ionicons
-              name={isFavorite ? 'heart' : 'heart-outline'}
-              size={22}
-              color={isFavorite ? COLORS.red : COLORS.white}
-            />
+          {/* Share Button */}
+          <TouchableOpacity style={styles.headerShareBtn} onPress={handleShare}>
+            <Ionicons name="share-outline" size={22} color={COLORS.white} />
           </TouchableOpacity>
         </View>
 
@@ -276,12 +278,18 @@ export default function ShopDetails() {
               </View>
             </Animated.View>
 
-            {/* Shop Name */}
+            {/* Shop Name & Address */}
             <View style={styles.shopNameContainer}>
-              <Text style={styles.shopName}>{shop.name || 'Unnamed Shop'}</Text>
-              {shop.isVerified && (
-                <Ionicons name="checkmark-circle" size={18} color="#1DA1F2" style={{ marginLeft: 4 }} />
-              )}
+              <View style={styles.nameRow}>
+                <Text style={styles.shopName}>{shop.name || 'Unnamed Shop'}</Text>
+                {shop.isVerified && (
+                  <Ionicons name="checkmark-circle" size={18} color="#1DA1F2" style={{ marginLeft: 4 }} />
+                )}
+              </View>
+              {/* Full Address Below Name */}
+              <Text style={styles.shopAddress} numberOfLines={1}>
+                {shop.location?.address || 'Location not set'}
+              </Text>
             </View>
 
             {/* Follow Button */}
@@ -305,9 +313,9 @@ export default function ShopDetails() {
               </Text>
             </View>
 
-            {/* Location with tap to navigate */}
-            <TouchableOpacity style={styles.statusItem} onPress={openMaps}>
-              <Ionicons name="location" size={16} color={COLORS.gray} />
+            {/* Location with tap to open modal */}
+            <TouchableOpacity style={styles.statusItem} onPress={() => setShowLocationModal(true)}>
+              <Ionicons name="location" size={16} color={COLORS.primary} />
               <Text style={styles.distanceText}>1.2 km</Text>
             </TouchableOpacity>
           </View>
@@ -347,6 +355,7 @@ export default function ShopDetails() {
                       key={item.id}
                       style={styles.productCard}
                       onPress={() => openProductView(item)}
+                      activeOpacity={0.9}
                     >
                       <View style={styles.productImageContainer}>
                         <Image
@@ -356,26 +365,27 @@ export default function ShopDetails() {
                         {/* Add to Cart Button */}
                         <TouchableOpacity
                           style={styles.addToCartBtn}
-                          onPress={(e) => { e.stopPropagation(); addToCart(item.id, item.name); }}
+                          onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
                         >
-                          <Ionicons name="add" size={18} color={COLORS.white} />
+                          {cart[item.id] > 0 ? (
+                            <Text style={styles.cartCountText}>{cart[item.id]}</Text>
+                          ) : (
+                            <Ionicons name="add" size={16} color={COLORS.white} />
+                          )}
                         </TouchableOpacity>
-                        {cart[item.id] > 0 && (
-                          <View style={styles.cartBadge}>
-                            <Text style={styles.cartBadgeText}>{cart[item.id]}</Text>
-                          </View>
-                        )}
                       </View>
-                      <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-                      <View style={styles.priceRow}>
-                        {item.discountPrice ? (
-                          <>
-                            <Text style={styles.originalPrice}>{item.price?.toLocaleString()}</Text>
-                            <Text style={styles.discountPrice}>{item.discountPrice?.toLocaleString()}</Text>
-                          </>
-                        ) : (
-                          <Text style={styles.productPrice}>{item.price?.toLocaleString()} UZS</Text>
-                        )}
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+                        <View style={styles.priceRow}>
+                          {item.discountPrice ? (
+                            <>
+                              <Text style={styles.originalPrice}>{item.price?.toLocaleString()}</Text>
+                              <Text style={styles.discountPrice}>{item.discountPrice?.toLocaleString()}</Text>
+                            </>
+                          ) : (
+                            <Text style={styles.productPrice}>{item.price?.toLocaleString()}</Text>
+                          )}
+                        </View>
                       </View>
                     </TouchableOpacity>
                   ))
@@ -401,77 +411,125 @@ export default function ShopDetails() {
             </View>
           )}
 
-          {activeTab === 'contacts' && (
-            <View style={styles.contactsSection}>
-              <TouchableOpacity style={styles.contactItem}>
-                <View style={[styles.contactIcon, { backgroundColor: '#25D366' }]}>
-                  <Ionicons name="logo-whatsapp" size={24} color={COLORS.white} />
-                </View>
-                <Text style={styles.contactLabel}>WhatsApp</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.contactItem}>
-                <View style={[styles.contactIcon, { backgroundColor: '#0088CC' }]}>
-                  <Ionicons name="paper-plane" size={22} color={COLORS.white} />
-                </View>
-                <Text style={styles.contactLabel}>Telegram</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.contactItem}>
-                <View style={[styles.contactIcon, { backgroundColor: COLORS.primary }]}>
-                  <Ionicons name="call" size={22} color={COLORS.white} />
-                </View>
-                <Text style={styles.contactLabel}>Phone</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-              </TouchableOpacity>
-
-              <View style={styles.messagingComing}>
-                <Ionicons name="chatbubbles-outline" size={32} color={COLORS.gray} />
-                <Text style={styles.comingSoonText}>In-app messaging coming soon!</Text>
+          {activeTab === 'info' && (
+            <View style={styles.infoSection}>
+              {/* About Us */}
+              <View style={styles.infoBlock}>
+                <Text style={styles.infoTitle}>About Us</Text>
+                <Text style={styles.infoText}>
+                  {shop.about || shop.description || 'No description available.'}
+                </Text>
               </View>
-            </View>
-          )}
 
-          {activeTab === 'about' && (
-            <View style={styles.aboutSection}>
-              {shop.description && (
-                <View style={styles.aboutCard}>
-                  <Text style={styles.aboutTitle}>Description</Text>
-                  <Text style={styles.aboutText}>{shop.description}</Text>
-                </View>
-              )}
+              {/* Store Hours */}
+              <View style={styles.infoBlock}>
+                <Text style={styles.infoTitle}>Store Hours</Text>
+                {shop.openingHours ? (
+                  Object.entries(shop.openingHours).map(([day, hours]: [string, any]) => (
+                    <View key={day} style={styles.hoursRow}>
+                      <Text style={styles.dayLabel}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
+                      <Text style={styles.hoursText}>{hours.open} - {hours.close}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.infoText}>Hours not set</Text>
+                )}
+              </View>
 
-              {shop.about && (
-                <View style={styles.aboutCard}>
-                  <Text style={styles.aboutTitle}>About</Text>
-                  <Text style={styles.aboutText}>{shop.about}</Text>
-                </View>
-              )}
+              {/* Contact & Location */}
+              <View style={styles.infoBlock}>
+                <Text style={styles.infoTitle}>Contact & Location</Text>
 
-              <View style={styles.aboutCard}>
-                <Text style={styles.aboutTitle}>Opening Hours</Text>
-                {shop.openingHours && Object.entries(shop.openingHours).map(([day, hours]: [string, any]) => (
-                  <View key={day} style={styles.hoursRow}>
-                    <Text style={styles.dayLabel}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
-                    <Text style={styles.hoursText}>{hours.open} - {hours.close}</Text>
+                <TouchableOpacity style={styles.contactRow} onPress={() => setShowLocationModal(true)}>
+                  <View style={styles.contactIconSmall}>
+                    <Ionicons name="location-outline" size={18} color={COLORS.primary} />
                   </View>
-                ))}
+                  <Text style={styles.contactText} numberOfLines={2}>
+                    {shop.location?.address || 'Location not set'}
+                  </Text>
+                </TouchableOpacity>
+
+                {shop.phone && (
+                  <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL(`tel:${shop.phone}`)}>
+                    <View style={styles.contactIconSmall}>
+                      <Ionicons name="call-outline" size={18} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.contactText}>{shop.phone}</Text>
+                  </TouchableOpacity>
+                )}
+
+                {shop.website && (
+                  <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL(shop.website)}>
+                    <View style={styles.contactIconSmall}>
+                      <Ionicons name="globe-outline" size={18} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.contactText}>{shop.website}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
-              {/* Location Card */}
-              <TouchableOpacity style={styles.aboutCard} onPress={openMaps}>
-                <Text style={styles.aboutTitle}>Location</Text>
-                <View style={styles.locationRow}>
-                  <Ionicons name="location" size={20} color={COLORS.primary} />
-                  <Text style={styles.locationAddressText}>{shop.location?.address || 'Tap to navigate'}</Text>
+              {/* Amenities */}
+              <View style={styles.infoBlock}>
+                <Text style={styles.infoTitle}>Amenities</Text>
+                <View style={styles.amenitiesGrid}>
+                  <View style={styles.amenityItem}>
+                    <Ionicons name="car-outline" size={20} color={COLORS.primary} />
+                    <Text style={styles.amenityText}>Parking{'\n'}Available</Text>
+                  </View>
+                  <View style={styles.amenityItem}>
+                    <Ionicons name="accessibility-outline" size={20} color={COLORS.primary} />
+                    <Text style={styles.amenityText}>Wheelchair{'\n'}Access</Text>
+                  </View>
+                  <View style={styles.amenityItem}>
+                    <Ionicons name="wifi-outline" size={20} color={COLORS.primary} />
+                    <Text style={styles.amenityText}>Free{'\n'}Wi-Fi</Text>
+                  </View>
+                  <View style={styles.amenityItem}>
+                    <Ionicons name="card-outline" size={20} color={COLORS.primary} />
+                    <Text style={styles.amenityText}>Contactless{'\n'}Pay</Text>
+                  </View>
                 </View>
-              </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
       </ScrollView>
+
+      {/* Location Preview Modal */}
+      <Modal
+        visible={showLocationModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.locationModal}>
+            {/* Map Preview */}
+            <View style={styles.mapPreview}>
+              <Image
+                source={{ uri: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/${shop.location?.lng || 69.24},${shop.location?.lat || 41.3}/14/400x200@2x?access_token=pk.placeholder` }}
+                style={styles.mapImage}
+              />
+              <View style={styles.mapPin}>
+                <Ionicons name="location" size={32} color={COLORS.primary} />
+              </View>
+            </View>
+
+            <Text style={styles.modalShopName}>{shop.name}</Text>
+            <Text style={styles.modalAddress}>{shop.location?.address || 'Location not set'}</Text>
+            <Text style={styles.modalDistance}>1.2 km away</Text>
+
+            <TouchableOpacity style={styles.navigateBtn} onPress={openMaps}>
+              <Ionicons name="navigate" size={20} color={COLORS.white} />
+              <Text style={styles.navigateBtnText}>Navigate</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.closeModalBtn} onPress={() => setShowLocationModal(false)}>
+              <Text style={styles.closeModalText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Floating Cart Button */}
       {getCartTotal() > 0 && (
@@ -536,7 +594,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerFavoriteBtn: {
+  headerShareBtn: {
     position: 'absolute',
     top: 50,
     right: 16,
@@ -594,14 +652,20 @@ const styles = StyleSheet.create({
   shopNameContainer: {
     flex: 1,
     marginLeft: 12,
+  },
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
   },
   shopName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.dark,
+  },
+  shopAddress: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginTop: 2,
   },
   followBtn: {
     backgroundColor: COLORS.primary,
@@ -679,7 +743,7 @@ const styles = StyleSheet.create({
   newBadge: {
     position: 'absolute',
     top: 6,
-    right: 8,
+    right: 16,
     backgroundColor: COLORS.red,
     paddingHorizontal: 4,
     paddingVertical: 1,
@@ -707,27 +771,31 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     marginTop: 40,
     fontSize: 16,
+    width: '100%',
   },
 
-  // Products Grid - 3 columns
+  // Products Grid - 2 columns with better cards
   productsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
   },
   productCard: {
-    width: (width - 52) / 3,
+    width: (width - 44) / 2,
     backgroundColor: COLORS.white,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   productImageContainer: {
     position: 'relative',
     width: '100%',
     aspectRatio: 1,
     backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    overflow: 'hidden',
   },
   productImage: {
     width: '100%',
@@ -736,11 +804,11 @@ const styles = StyleSheet.create({
   },
   addToCartBtn: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    bottom: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -750,47 +818,37 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  cartBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: COLORS.red,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cartBadgeText: {
+  cartCountText: {
     color: COLORS.white,
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: 'bold',
   },
+  productInfo: {
+    padding: 12,
+  },
   productName: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     color: COLORS.dark,
-    marginTop: 6,
-    lineHeight: 16,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
+    gap: 6,
+    marginTop: 4,
   },
   productPrice: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
     color: COLORS.primary,
   },
   originalPrice: {
-    fontSize: 10,
+    fontSize: 12,
     color: COLORS.gray,
     textDecorationLine: 'line-through',
   },
   discountPrice: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
     color: COLORS.red,
   },
@@ -811,57 +869,20 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
 
-  // Contacts
-  contactsSection: {
-    gap: 12,
+  // Info Section (Combined About + Contact)
+  infoSection: {
+    gap: 0,
   },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: 16,
-    borderRadius: 12,
+  infoBlock: {
+    marginBottom: 24,
   },
-  contactIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  contactLabel: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: COLORS.dark,
-  },
-  messagingComing: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  comingSoonText: {
-    marginTop: 12,
-    color: COLORS.gray,
-    fontSize: 14,
-  },
-
-  // About
-  aboutSection: {
-    gap: 16,
-  },
-  aboutCard: {
-    backgroundColor: COLORS.white,
-    padding: 16,
-    borderRadius: 12,
-  },
-  aboutTitle: {
+  infoTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.dark,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  aboutText: {
+  infoText: {
     fontSize: 14,
     color: COLORS.dark,
     lineHeight: 22,
@@ -869,26 +890,130 @@ const styles = StyleSheet.create({
   hoursRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   dayLabel: {
     fontSize: 14,
-    color: COLORS.gray,
+    color: COLORS.dark,
   },
   hoursText: {
     fontSize: 14,
-    color: COLORS.dark,
-    fontWeight: '500',
+    color: COLORS.gray,
   },
-  locationRow: {
+  contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    paddingVertical: 10,
+    gap: 12,
   },
-  locationAddressText: {
+  contactIconSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFF5EE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contactText: {
     flex: 1,
     fontSize: 14,
     color: COLORS.dark,
+  },
+  amenitiesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  amenityItem: {
+    width: (width - 56) / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    padding: 12,
+    borderRadius: 12,
+    gap: 10,
+  },
+  amenityText: {
+    fontSize: 12,
+    color: COLORS.dark,
+    lineHeight: 16,
+  },
+
+  // Location Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  locationModal: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  mapPreview: {
+    height: 150,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  mapPin: {
+    position: 'absolute',
+  },
+  modalShopName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.dark,
+    textAlign: 'center',
+  },
+  modalAddress: {
+    fontSize: 14,
+    color: COLORS.gray,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  modalDistance: {
+    fontSize: 14,
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  navigateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 20,
+    gap: 8,
+  },
+  navigateBtnText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  closeModalBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  closeModalText: {
+    color: COLORS.gray,
+    fontSize: 14,
   },
 
   // Floating Cart
