@@ -1,14 +1,25 @@
-import React, { useEffect, useState, useRef } from 'react';
-import {
-  View, Text, Image, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Dimensions, Animated, Linking, Platform, Modal, Share
-} from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { getTelegramImageUrl } from '@/configs/AppConfig';
+import { db } from '@/configs/FirebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { db } from '@/configs/FirebaseConfig';
-import { getTelegramImageUrl } from '@/configs/AppConfig';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -182,11 +193,44 @@ export default function ShopDetails() {
     setIsFollowing(!isFollowing);
   };
 
+  // Track which cards have expanded controls
+  const [expandedItems, setExpandedItems] = useState<{ [key: string]: boolean }>({});
+  const cardTimers = useRef<{ [key: string]: ReturnType<typeof setTimeout> }>({});
+
+  const collapseCard = (productId: string) => {
+    setExpandedItems(prev => ({ ...prev, [productId]: false }));
+  };
+
+  const resetCardTimer = (productId: string) => {
+    // Clear existing timer
+    if (cardTimers.current[productId]) {
+      clearTimeout(cardTimers.current[productId]);
+    }
+    // Set new 3-second timer to collapse
+    cardTimers.current[productId] = setTimeout(() => {
+      collapseCard(productId);
+    }, 3000);
+  };
+
   const addToCart = (productId: string) => {
     setCart(prev => ({
       ...prev,
       [productId]: (prev[productId] || 0) + 1
     }));
+    setExpandedItems(prev => ({ ...prev, [productId]: true }));
+    resetCardTimer(productId);
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart(prev => {
+      const newQty = Math.max(0, (prev[productId] || 0) - 1);
+      if (newQty === 0) {
+        const { [productId]: removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [productId]: newQty };
+    });
+    resetCardTimer(productId);
   };
 
   const getCartTotal = () => {
@@ -389,17 +433,45 @@ export default function ShopDetails() {
                             </View>
                           )}
 
-                          {/* Add to Cart Button */}
-                          <TouchableOpacity
-                            style={styles.addToCartBtn}
-                            onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
-                          >
-                            {cart[item.id] > 0 ? (
-                              <Text style={styles.cartCountText}>{cart[item.id]}</Text>
-                            ) : (
+                          {/* Cart Controls */}
+                          {cart[item.id] > 0 && expandedItems[item.id] ? (
+                            // Expanded: show - count +
+                            <View style={styles.expandedCartControls}>
+                              <TouchableOpacity
+                                style={styles.cartControlBtn}
+                                onPress={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
+                              >
+                                <Ionicons name="remove" size={18} color={COLORS.primary} />
+                              </TouchableOpacity>
+                              <Text style={styles.cartControlCount}>{cart[item.id]}</Text>
+                              <TouchableOpacity
+                                style={styles.cartControlBtn}
+                                onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
+                              >
+                                <Ionicons name="add" size={18} color={COLORS.primary} />
+                              </TouchableOpacity>
+                            </View>
+                          ) : cart[item.id] > 0 ? (
+                            // Collapsed: show count badge
+                            <TouchableOpacity
+                              style={styles.cartBadgeBtn}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                setExpandedItems(prev => ({ ...prev, [item.id]: true }));
+                                resetCardTimer(item.id);
+                              }}
+                            >
+                              <Text style={styles.cartBadgeText}>{cart[item.id]}</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            // No items: show + button
+                            <TouchableOpacity
+                              style={styles.addToCartBtn}
+                              onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
+                            >
                               <Ionicons name="add" size={24} color={COLORS.primary} />
-                            )}
-                          </TouchableOpacity>
+                            </TouchableOpacity>
+                          )}
                         </View>
 
                         {/* Product Info */}
@@ -568,15 +640,14 @@ export default function ShopDetails() {
         </View>
       </Modal>
 
-      {/* Floating Cart Button */}
+      {/* Floating Cart Bar - Uzum style */}
       {getCartTotal() > 0 && (
-        <TouchableOpacity style={styles.floatingCart}>
-          <Ionicons name="cart" size={24} color={COLORS.white} />
-          <View style={styles.floatingCartBadge}>
-            <Text style={styles.floatingCartBadgeText}>{getCartTotal()}</Text>
+        <TouchableOpacity style={styles.floatingCart} activeOpacity={0.95}>
+          <View style={styles.cartCountCircle}>
+            <Text style={styles.cartCountCircleText}>{getCartTotal()}</Text>
           </View>
-          <Text style={styles.floatingCartText}>{getCartTotalPrice().toLocaleString()} UZS</Text>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.white} />
+          <Text style={styles.goToCartText}>Savatga</Text>
+          <Text style={styles.cartPriceText}>{getCartTotalPrice().toLocaleString()} so'm</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -888,6 +959,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  // Expanded cart controls (- count +)
+  expandedCartControls: {
+    position: 'absolute',
+    bottom: -20,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 22,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  cartControlBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cartControlCount: {
+    minWidth: 24,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.dark,
+  },
+  // Collapsed badge button
+  cartBadgeBtn: {
+    position: 'absolute',
+    bottom: -20,
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  cartBadgeText: {
+    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   productInfo: {
     padding: 12,
     paddingTop: 16,
@@ -1091,36 +1219,39 @@ const styles = StyleSheet.create({
     bottom: 24,
     left: 16,
     right: 16,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#7B2DFF', // Purple like Uzum
     borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    paddingHorizontal: 20,
-    gap: 8,
-    shadowColor: '#000',
+    padding: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+    shadowColor: '#7B2DFF',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
     elevation: 8,
   },
-  floatingCartBadge: {
-    backgroundColor: COLORS.red,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  cartCountCircle: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: -4,
-    marginRight: 8,
   },
-  floatingCartBadgeText: {
+  cartCountCircleText: {
     color: COLORS.white,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
   },
-  floatingCartText: {
+  goToCartText: {
     flex: 1,
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cartPriceText: {
     color: COLORS.white,
     fontSize: 16,
     fontWeight: 'bold',
