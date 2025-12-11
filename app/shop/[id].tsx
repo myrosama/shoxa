@@ -1,5 +1,6 @@
 import { getTelegramImageUrl } from '@/configs/AppConfig';
 import { db } from '@/configs/FirebaseConfig';
+import { useCart } from '@/contexts/CartContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -72,6 +73,7 @@ type TabType = 'products' | 'posts' | 'info';
 export default function ShopDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const globalCart = useCart();
   const [shop, setShop] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
@@ -82,11 +84,28 @@ export default function ShopDetails() {
   const [hasStory, setHasStory] = useState(false);
   const [hasNewPosts, setHasNewPosts] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [cart, setCart] = useState<{ [key: string]: number }>({});
   const [openStatus, setOpenStatus] = useState({ isOpen: false, statusText: '', statusColor: COLORS.gray });
   const [showLocationModal, setShowLocationModal] = useState(false);
 
   const storyPulse = useRef(new Animated.Value(1)).current;
+
+  // Button scale animations for cart controls
+  const buttonScales = useRef<{ [key: string]: Animated.Value }>({}).current;
+
+  const getButtonScale = (productId: string) => {
+    if (!buttonScales[productId]) {
+      buttonScales[productId] = new Animated.Value(1);
+    }
+    return buttonScales[productId];
+  };
+
+  const animateButtonPress = (productId: string) => {
+    const scale = getButtonScale(productId);
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 0.85, duration: 80, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 80, useNativeDriver: true }),
+    ]).start();
+  };
 
   useEffect(() => {
     if (hasStory) {
@@ -212,37 +231,44 @@ export default function ShopDetails() {
     }, 3000);
   };
 
-  const addToCart = (productId: string) => {
-    setCart(prev => ({
-      ...prev,
-      [productId]: (prev[productId] || 0) + 1
-    }));
-    setExpandedItems(prev => ({ ...prev, [productId]: true }));
-    resetCardTimer(productId);
+  const addToCart = (product: any) => {
+    animateButtonPress(product.id);
+    globalCart.addItem({
+      productId: product.id,
+      shopId: id as string,
+      shopName: shop?.name || 'Shop',
+      name: product.name,
+      price: product.price,
+      discountPrice: product.discountPrice,
+      imageUrl: product.imageUrl,
+    });
+    setExpandedItems(prev => ({ ...prev, [product.id]: true }));
+    resetCardTimer(product.id);
   };
 
   const removeFromCart = (productId: string) => {
-    setCart(prev => {
-      const newQty = Math.max(0, (prev[productId] || 0) - 1);
-      if (newQty === 0) {
-        const { [productId]: removed, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [productId]: newQty };
-    });
+    animateButtonPress(productId);
+    globalCart.removeItem(productId, id as string);
     resetCardTimer(productId);
   };
 
+  const getItemQty = (productId: string) => {
+    return globalCart.getItemQuantity(productId, id as string);
+  };
+
   const getCartTotal = () => {
-    return Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+    return globalCart.getShopItems(id as string).reduce((sum, item) => sum + item.quantity, 0);
   };
 
   const getCartTotalPrice = () => {
-    return products.reduce((sum, p) => {
-      const qty = cart[p.id] || 0;
-      const price = p.discountPrice || p.price || 0;
-      return sum + (qty * price);
+    return globalCart.getShopItems(id as string).reduce((sum, item) => {
+      const price = item.discountPrice || item.price;
+      return sum + (price * item.quantity);
     }, 0);
+  };
+
+  const goToCart = () => {
+    router.push('/(tabs)/cart');
   };
 
   const openProductView = (product: any) => {
@@ -336,29 +362,18 @@ export default function ShopDetails() {
               </Text>
             </View>
 
-            {/* Action Buttons Column */}
-            <View style={styles.actionButtons}>
-              {/* Follow Button */}
-              <TouchableOpacity
-                style={[styles.followBtn, isFollowing && styles.followingBtn]}
-                onPress={toggleFollow}
-              >
-                <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
-                  {isFollowing ? 'Following' : 'Follow'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Location Button */}
-              <TouchableOpacity
-                style={styles.locationBtn}
-                onPress={() => setShowLocationModal(true)}
-              >
-                <Ionicons name="navigate" size={18} color={COLORS.white} />
-              </TouchableOpacity>
-            </View>
+            {/* Follow Button Only */}
+            <TouchableOpacity
+              style={[styles.followBtn, isFollowing && styles.followingBtn]}
+              onPress={toggleFollow}
+            >
+              <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
+                {isFollowing ? 'Following' : 'Follow'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Status Row */}
+          {/* Status Row with Location Button */}
           <View style={styles.statusRow}>
             {/* Open Status */}
             <View style={styles.statusItem}>
@@ -368,10 +383,21 @@ export default function ShopDetails() {
               </Text>
             </View>
 
-            {/* Location with tap to open modal */}
-            <TouchableOpacity style={styles.statusItem} onPress={() => setShowLocationModal(true)}>
+            {/* Distance */}
+            <View style={styles.statusItem}>
               <Ionicons name="location" size={16} color={COLORS.primary} />
               <Text style={styles.distanceText}>1.2 km</Text>
+            </View>
+
+            {/* Spacer */}
+            <View style={{ flex: 1 }} />
+
+            {/* Location Navigate Button */}
+            <TouchableOpacity
+              style={styles.locationBtn}
+              onPress={() => setShowLocationModal(true)}
+            >
+              <Ionicons name="navigate" size={18} color={COLORS.white} />
             </TouchableOpacity>
           </View>
         </View>
@@ -434,24 +460,24 @@ export default function ShopDetails() {
                           )}
 
                           {/* Cart Controls */}
-                          {cart[item.id] > 0 && expandedItems[item.id] ? (
+                          {getItemQty(item.id) > 0 && expandedItems[item.id] ? (
                             // Expanded: show - count +
-                            <View style={styles.expandedCartControls}>
+                            <Animated.View style={[styles.expandedCartControls, { transform: [{ scale: getButtonScale(item.id) }] }]}>
                               <TouchableOpacity
                                 style={styles.cartControlBtn}
                                 onPress={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
                               >
                                 <Ionicons name="remove" size={18} color={COLORS.primary} />
                               </TouchableOpacity>
-                              <Text style={styles.cartControlCount}>{cart[item.id]}</Text>
+                              <Text style={styles.cartControlCount}>{getItemQty(item.id)}</Text>
                               <TouchableOpacity
                                 style={styles.cartControlBtn}
-                                onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
+                                onPress={(e) => { e.stopPropagation(); addToCart(item); }}
                               >
                                 <Ionicons name="add" size={18} color={COLORS.primary} />
                               </TouchableOpacity>
-                            </View>
-                          ) : cart[item.id] > 0 ? (
+                            </Animated.View>
+                          ) : getItemQty(item.id) > 0 ? (
                             // Collapsed: show count badge
                             <TouchableOpacity
                               style={styles.cartBadgeBtn}
@@ -461,13 +487,13 @@ export default function ShopDetails() {
                                 resetCardTimer(item.id);
                               }}
                             >
-                              <Text style={styles.cartBadgeText}>{cart[item.id]}</Text>
+                              <Text style={styles.cartBadgeText}>{getItemQty(item.id)}</Text>
                             </TouchableOpacity>
                           ) : (
                             // No items: show + button
                             <TouchableOpacity
                               style={styles.addToCartBtn}
-                              onPress={(e) => { e.stopPropagation(); addToCart(item.id); }}
+                              onPress={(e) => { e.stopPropagation(); addToCart(item); }}
                             >
                               <Ionicons name="add" size={24} color={COLORS.primary} />
                             </TouchableOpacity>
@@ -640,9 +666,9 @@ export default function ShopDetails() {
         </View>
       </Modal>
 
-      {/* Floating Cart Bar - Uzum style */}
+      {/* Floating Cart Bar */}
       {getCartTotal() > 0 && (
-        <TouchableOpacity style={styles.floatingCart} activeOpacity={0.95}>
+        <TouchableOpacity style={styles.floatingCart} activeOpacity={0.9} onPress={goToCart}>
           <View style={styles.cartCountCircle}>
             <Text style={styles.cartCountCircleText}>{getCartTotal()}</Text>
           </View>
@@ -1219,14 +1245,14 @@ const styles = StyleSheet.create({
     bottom: 24,
     left: 16,
     right: 16,
-    backgroundColor: '#7B2DFF', // Purple like Uzum
+    backgroundColor: COLORS.primary,
     borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
     paddingHorizontal: 16,
     gap: 12,
-    shadowColor: '#7B2DFF',
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
