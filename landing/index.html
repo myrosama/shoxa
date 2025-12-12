@@ -2,88 +2,293 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SHOXA - Coming Soon</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #FDF6E3 0%, #F5D6BA 100%);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            text-align: center;
-            padding: 20px;
-        }
-
-        .logo {
-            width: 120px;
-            height: 120px;
-            margin-bottom: 20px;
-        }
-
-        h1 {
-            font-size: 48px;
-            font-weight: 800;
-            color: #C67C43;
-            margin-bottom: 16px;
-        }
-
-        .tagline {
-            font-size: 20px;
-            color: #5D4037;
-            margin-bottom: 40px;
-        }
-
-        .coming-soon {
-            display: inline-block;
-            padding: 16px 40px;
-            background: #C67C43;
-            color: white;
-            font-size: 18px;
-            font-weight: 600;
-            border-radius: 50px;
-            box-shadow: 0 8px 24px rgba(198, 124, 67, 0.3);
-        }
-
-        .footer {
-            position: absolute;
-            bottom: 30px;
-            color: #A0522D;
-            font-size: 14px;
-        }
-
-        @media (max-width: 600px) {
-            h1 {
-                font-size: 36px;
-            }
-
-            .tagline {
-                font-size: 16px;
-            }
-
-            .logo {
-                font-size: 48px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SHOXA - Discover local shops, restaurants, pharmacies and more in Tashkent. Your go-to app for exploring what's around you.">
+  <meta name="keywords" content="SHOXA, local shops, Tashkent, Uzbekistan, delivery, restaurants, pharmacy, grocery">
+  <meta property="og:title" content="SHOXA - Discover Local Shops & More">
+  <meta property="og:description" content="Your go-to app for exploring local shops, restaurants, and services in Uzbekistan.">
+  <meta property="og:type" content="website">
+  
+  <title>SHOXA - Discover Local Shops, Restaurants & More</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="logo.png">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-    <img src="logo.png" alt="SHOXA" class="logo">
-    <h1>SHOXA</h1>
-    <p class="tagline">Discover local shops, restaurants & more</p>
-    <div class="coming-soon">Coming Soon</div>
-    <p class="footer">Tashkent, Uzbekistan</p>
+  <!-- Animated Background -->
+  <div class="animated-bg">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+  
+  <!-- Large Watermark -->
+  <div class="watermark">SHOXA</div>
+
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="#" class="nav-logo">
+        <img src="logo.png" alt="SHOXA">
+        <span>SHOXA</span>
+      </a>
+      
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#app">App</a></li>
+        <li><a href="#download">Download</a></li>
+        <li><a href="#download" class="nav-cta">Get Started</a></li>
+      </ul>
+      
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero section">
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-text">
+          <div class="hero-badge">Local Discovery Platform</div>
+          <h1 class="hero-title">
+            <span class="highlight">Discover</span> Local Shops, Restaurants & More
+          </h1>
+          <p class="hero-subtitle">
+            Your go-to app for exploring what's around you in Uzbekistan. Find shops, order food, 
+            get groceries, and more — all in one beautifully designed app.
+          </p>
+          <div class="hero-cta">
+            <a href="#download" class="btn btn-primary">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download App
+            </a>
+            <a href="#features" class="btn btn-secondary">
+              Learn More
+            </a>
+          </div>
+        </div>
+        
+        <div class="hero-visual">
+          <div class="logo-container">
+            <div class="logo-glow"></div>
+            <div class="orbit">
+              <div class="orbit-dot"></div>
+              <div class="orbit-dot"></div>
+            </div>
+            <div class="logo-circle">
+              <img src="logo.png" alt="SHOXA Logo">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Bar -->
+  <section class="stats-bar">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-number" data-target="50">50+</div>
+          <div class="stat-label">Local Shops</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number" data-target="10">10+</div>
+          <div class="stat-label">Categories</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number" data-target="500">500+</div>
+          <div class="stat-label">Products</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number" data-target="24">24/7</div>
+          <div class="stat-label">Support</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features section" id="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-tag">What We Offer</span>
+        <h2 class="section-title">Everything You Need, <span class="highlight">Nearby</span></h2>
+        <p class="section-subtitle">
+          Explore a wide variety of local businesses and services, all accessible from your phone.
+        </p>
+      </div>
+      
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🍕</div>
+          <h3 class="feature-title">Food & Restaurants</h3>
+          <p class="feature-desc">Order from your favorite local restaurants and cafes with fast delivery.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">💊</div>
+          <h3 class="feature-title">Pharmacy</h3>
+          <p class="feature-desc">Find medicines and health products from nearby pharmacies.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">🛒</div>
+          <h3 class="feature-title">Grocery</h3>
+          <p class="feature-desc">Fresh groceries and daily essentials delivered to your doorstep.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">🏪</div>
+          <h3 class="feature-title">Local Shops</h3>
+          <p class="feature-desc">Discover unique local shops and support small businesses in your area.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- App Showcase Section -->
+  <section class="app-showcase section" id="app">
+    <div class="container">
+      <div class="showcase-content">
+        <div class="showcase-text reveal">
+          <h2>Experience <span class="highlight">Seamless</span> Local Discovery</h2>
+          <p>
+            SHOXA brings together all the local businesses you love in one beautiful, 
+            easy-to-use app. Built with care, designed for Uzbekistan.
+          </p>
+          
+          <ul class="showcase-list">
+            <li>
+              <span class="check-icon">✓</span>
+              <span>Beautiful, intuitive interface</span>
+            </li>
+            <li>
+              <span class="check-icon">✓</span>
+              <span>Real-time shop availability</span>
+            </li>
+            <li>
+              <span class="check-icon">✓</span>
+              <span>Easy ordering & payment</span>
+            </li>
+            <li>
+              <span class="check-icon">✓</span>
+              <span>Fast local delivery</span>
+            </li>
+          </ul>
+          
+          <a href="#download" class="btn btn-primary">Get the App</a>
+        </div>
+        
+        <div class="phone-mockup reveal">
+          <div class="phone">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="phone-screen-placeholder">
+                <img src="logo.png" alt="SHOXA" class="logo-small">
+                <h3>SHOXA</h3>
+                <p>Discover local shops</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download Section -->
+  <section class="download section" id="download">
+    <div class="container">
+      <div class="download-card reveal">
+        <h2>Ready to Explore?</h2>
+        <p>Download SHOXA now and start discovering amazing local businesses around you.</p>
+        
+        <div class="download-buttons">
+          <a href="#" class="store-btn">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+            </svg>
+            <div class="store-btn-text">
+              <span>Coming Soon on</span>
+              <strong>App Store</strong>
+            </div>
+          </a>
+          
+          <a href="#" class="store-btn">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 0 1-.61-.92V2.734a1 1 0 0 1 .609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 0 1 0 1.73l-2.808 1.626L15.206 12l2.492-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z"/>
+            </svg>
+            <div class="store-btn-text">
+              <span>Coming Soon on</span>
+              <strong>Google Play</strong>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <img src="logo.png" alt="SHOXA">
+          <span>SHOXA</span>
+        </div>
+        
+        <ul class="footer-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#app">About</a></li>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Terms</a></li>
+        </ul>
+        
+        <div class="footer-social">
+          <a href="#" aria-label="Instagram">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+            </svg>
+          </a>
+          <a href="#" aria-label="Telegram">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+      
+      <div class="footer-bottom">
+        <p>
+          © 2024 SHOXA. All rights reserved. 
+          <span class="location">📍 Made in Tashkent, Uzbekistan</span>
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="script.js"></script>
 </body>
 
 </html>
