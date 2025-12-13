@@ -74,6 +74,7 @@ export default function ShopDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const globalCart = useCart();
+  const { calculateDistance } = useLocation();
   const [shop, setShop] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
@@ -386,7 +387,11 @@ export default function ShopDetails() {
             {/* Distance */}
             <View style={styles.statusItem}>
               <Ionicons name="location" size={16} color={COLORS.primary} />
-              <Text style={styles.distanceText}>1.2 km</Text>
+              <Text style={styles.distanceText}>
+                {shop?.latitude && shop?.longitude
+                  ? calculateDistance(shop.latitude, shop.longitude)
+                  : '--'}
+              </Text>
             </View>
 
             {/* Spacer */}
@@ -652,7 +657,11 @@ export default function ShopDetails() {
 
             <Text style={styles.modalShopName}>{shop.name}</Text>
             <Text style={styles.modalAddress}>{shop.location?.address || 'Location not set'}</Text>
-            <Text style={styles.modalDistance}>1.2 km away</Text>
+            <Text style={styles.modalDistance}>
+              {shop?.latitude && shop?.longitude
+                ? `${calculateDistance(shop.latitude, shop.longitude)} away`
+                : 'Distance unavailable'}
+            </Text>
 
             <TouchableOpacity style={styles.navigateBtn} onPress={openMaps}>
               <Ionicons name="navigate" size={20} color={COLORS.white} />

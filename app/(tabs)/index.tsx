@@ -1,4 +1,5 @@
 import { db } from '@/configs/FirebaseConfig';
+import { useLocation } from '@/contexts/LocationContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { collection, getDocs, onSnapshot, query } from 'firebase/firestore';
@@ -16,6 +17,7 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 const COLORS = {
   background: '#FDF6E3',
@@ -43,9 +45,11 @@ const CATEGORIES = [
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40) / 2 - 8;
 
+
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { calculateDistance } = useLocation();
   const [shops, setShops] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -424,7 +428,11 @@ export default function HomeScreen() {
                       <View style={styles.cardFooter}>
                         <View style={styles.locationContainer}>
                           <Ionicons name="location-sharp" size={14} color={COLORS.primary} />
-                          <Text style={styles.distanceText}>1.2 km</Text>
+                          <Text style={styles.distanceText}>
+                            {shop.latitude && shop.longitude
+                              ? calculateDistance(shop.latitude, shop.longitude)
+                              : '--'}
+                          </Text>
                         </View>
                         <TouchableOpacity
                           style={styles.locationButton}
