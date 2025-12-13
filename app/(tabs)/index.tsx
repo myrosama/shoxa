@@ -1,13 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  StyleSheet, Text, View, Image, ScrollView,
-  TouchableOpacity, StatusBar, Dimensions, ActivityIndicator, Pressable, Platform, Animated
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { db } from '@/configs/FirebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { collection, query, onSnapshot } from 'firebase/firestore';
-import { db } from '@/configs/FirebaseConfig';
+import { collection, getDocs, onSnapshot, query } from 'firebase/firestore';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet, Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const COLORS = {
   background: '#FDF6E3',
@@ -39,9 +47,11 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [shops, setShops] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
   const [directionModalShop, setDirectionModalShop] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'shops' | 'products'>('shops');
 
   // Animated scroll value
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -76,6 +86,31 @@ export default function HomeScreen() {
         })
       );
       setShops(shopsData);
+
+      // Load products from all shops
+      const allProducts: any[] = [];
+      for (const shop of shopsData) {
+        try {
+          const productsSnapshot = await getDocs(collection(db, 'shops', shop.id, 'products'));
+          for (const productDoc of productsSnapshot.docs) {
+            const productData = productDoc.data();
+            let imageUrl = null;
+            if (productData.imageFileId) {
+              imageUrl = await getTelegramImageUrl(productData.imageFileId);
+            }
+            allProducts.push({
+              id: productDoc.id,
+              shopId: shop.id,
+              shopName: shop.name,
+              ...productData,
+              imageUrl,
+            });
+          }
+        } catch (e) {
+          console.error('Error loading products for shop', shop.id, e);
+        }
+      }
+      setProducts(allProducts);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -314,9 +349,24 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Categories Title (scrolls away) */}
+        {/* Categories Title with Toggle */}
         <View style={styles.categoriesTitleSection}>
           <Text style={styles.categoryTitle}>Categories</Text>
+          {/* Small toggle buttons on the right */}
+          <View style={styles.miniToggleContainer}>
+            <TouchableOpacity
+              style={[styles.miniToggleBtn, viewMode === 'shops' && styles.miniToggleBtnActive]}
+              onPress={() => setViewMode('shops')}
+            >
+              <Text style={[styles.miniToggleText, viewMode === 'shops' && styles.miniToggleTextActive]}>Shops</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.miniToggleBtn, viewMode === 'products' && styles.miniToggleBtnActive]}
+              onPress={() => setViewMode('products')}
+            >
+              <Text style={[styles.miniToggleText, viewMode === 'products' && styles.miniToggleTextActive]}>Products</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Category Pills (in-flow, stays visible - no fade) */}
@@ -338,50 +388,98 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Shop List */}
+        {/* Content List */}
         <View style={[styles.listSection, styles.contentBackground]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitleNoPadding}>Recommended for you</Text>
+            <Text style={styles.sectionTitleNoPadding}>
+              {viewMode === 'shops' ? 'Recommended for you' : 'Products for you'}
+            </Text>
             <TouchableOpacity><Text style={styles.seeAll}>See all</Text></TouchableOpacity>
           </View>
 
           {loading ? <ActivityIndicator size="large" color={COLORS.primary} /> : (
             <View style={styles.gridContainer}>
-              {filteredShops.map((shop) => (
-                <TouchableOpacity
-                  key={shop.id}
-                  style={styles.card}
-                  onPress={() => router.push(`/shop/${shop.id}`)}
-                  activeOpacity={0.9}
-                >
-                  <Image
-                    source={{ uri: shop.logoUrl || 'https://via.placeholder.com/150?text=No+Image' }}
-                    style={styles.cardImage}
-                  />
-                  <View style={styles.cardContent}>
-                    <View style={styles.cardHeader}>
-                      <Text style={styles.cardTitle} numberOfLines={2}>{shop.name || 'Unnamed Shop'}</Text>
-                      <View style={styles.ratingContainer}>
-                        <Ionicons name="star" size={12} color={COLORS.yellow} />
-                        <Text style={styles.ratingText}>{shop.rating || '4.5'}</Text>
+              {viewMode === 'shops' ? (
+                // SHOPS VIEW
+                filteredShops.map((shop) => (
+                  <TouchableOpacity
+                    key={shop.id}
+                    style={styles.card}
+                    onPress={() => router.push(`/shop/${shop.id}`)}
+                    activeOpacity={0.9}
+                  >
+                    <Image
+                      source={{ uri: shop.logoUrl || 'https://via.placeholder.com/150?text=No+Image' }}
+                      style={styles.cardImage}
+                    />
+                    <View style={styles.cardContent}>
+                      <View style={styles.cardHeader}>
+                        <Text style={styles.cardTitle} numberOfLines={2}>{shop.name || 'Unnamed Shop'}</Text>
+                        <View style={styles.ratingContainer}>
+                          <Ionicons name="star" size={12} color={COLORS.yellow} />
+                          <Text style={styles.ratingText}>{shop.rating || '4.5'}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.cardType}>{shop.type || 'Shop'}</Text>
+                      <View style={styles.cardFooter}>
+                        <View style={styles.locationContainer}>
+                          <Ionicons name="location-sharp" size={14} color={COLORS.primary} />
+                          <Text style={styles.distanceText}>1.2 km</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.locationButton}
+                          onPress={(e) => { e.stopPropagation(); handleLocationClick(shop); }}
+                        >
+                          <Ionicons name="navigate" size={16} color={COLORS.white} />
+                        </TouchableOpacity>
                       </View>
                     </View>
-                    <Text style={styles.cardType}>{shop.type || 'Shop'}</Text>
-                    <View style={styles.cardFooter}>
-                      <View style={styles.locationContainer}>
-                        <Ionicons name="location-sharp" size={14} color={COLORS.primary} />
-                        <Text style={styles.distanceText}>1.2 km</Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                // PRODUCTS VIEW
+                products.map((product) => (
+                  <TouchableOpacity
+                    key={`${product.shopId}-${product.id}`}
+                    style={styles.card}
+                    onPress={() => router.push(`/product/${product.id}?shopId=${product.shopId}`)}
+                    activeOpacity={0.9}
+                  >
+                    <Image
+                      source={{ uri: product.imageUrl || 'https://via.placeholder.com/150?text=Product' }}
+                      style={styles.cardImage}
+                    />
+                    <View style={styles.cardContent}>
+                      <View style={styles.cardHeader}>
+                        <Text style={styles.cardTitle} numberOfLines={2}>{product.name || 'Product'}</Text>
+                        {product.discountPrice && (
+                          <View style={styles.discountBadge}>
+                            <Text style={styles.discountBadgeText}>
+                              -{Math.round(100 - (product.discountPrice / product.price) * 100)}%
+                            </Text>
+                          </View>
+                        )}
                       </View>
-                      <TouchableOpacity
-                        style={styles.locationButton}
-                        onPress={(e) => { e.stopPropagation(); handleLocationClick(shop); }}
-                      >
-                        <Ionicons name="navigate" size={16} color={COLORS.white} />
-                      </TouchableOpacity>
+                      <Text style={styles.cardType}>{product.shopName}</Text>
+                      <View style={styles.cardFooter}>
+                        <View style={styles.priceContainer}>
+                          {product.discountPrice ? (
+                            <>
+                              <Text style={styles.discountPrice}>{product.discountPrice?.toLocaleString()}</Text>
+                              <Text style={styles.originalPrice}>{product.price?.toLocaleString()}</Text>
+                            </>
+                          ) : (
+                            <Text style={styles.productPrice}>{product.price?.toLocaleString()} so'm</Text>
+                          )}
+                        </View>
+                        <TouchableOpacity style={styles.addToCartBtn}>
+                          <Ionicons name="add" size={18} color={COLORS.white} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                ))
+              )}
             </View>
           )}
         </View>
@@ -518,11 +616,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 5,
     paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   categoryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.dark,
+  },
+  // Mini toggle buttons (icon only)
+  miniToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F5EFE6',
+    borderRadius: 10,
+    padding: 3,
+    gap: 2,
+  },
+  miniToggleBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  miniToggleBtnActive: {
+    backgroundColor: COLORS.primary,
+  },
+  miniToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  miniToggleTextActive: {
+    color: COLORS.white,
   },
 
   // In-flow Categories Section
@@ -536,6 +661,45 @@ const styles = StyleSheet.create({
   categoryPillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   categoryPillInactive: { backgroundColor: COLORS.white, borderColor: '#E0E0E0' },
   categoryText: { fontWeight: '600', fontSize: 14 },
+
+  // Toggle Switch Section
+  toggleSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    backgroundColor: COLORS.background,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F5EFE6',
+    borderRadius: 14,
+    padding: 4,
+  },
+  toggleOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 6,
+  },
+  toggleOptionActive: {
+    backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  toggleTextActive: {
+    color: COLORS.white,
+  },
 
   // List
   listSection: { paddingHorizontal: 20, minHeight: 800 },
@@ -557,6 +721,48 @@ const styles = StyleSheet.create({
   locationContainer: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   distanceText: { fontSize: 12, color: COLORS.gray, marginLeft: 4, fontWeight: '500' },
   locationButton: { backgroundColor: COLORS.primary, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
+
+  // Product card specific styles
+  discountBadge: {
+    backgroundColor: '#E53935',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  discountBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
+  },
+  productPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  discountPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  originalPrice: {
+    fontSize: 11,
+    color: COLORS.gray,
+    textDecorationLine: 'line-through',
+  },
+  addToCartBtn: {
+    backgroundColor: COLORS.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   modalOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
