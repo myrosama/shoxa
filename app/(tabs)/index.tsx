@@ -9,6 +9,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StatusBar,
@@ -26,6 +27,7 @@ const COLORS = {
   secondary: '#A0522D',
   dark: '#333333',
   gray: '#888888',
+  lightGray: '#E0E0E0',
   white: '#FFFFFF',
   cardShadow: 'rgba(198, 124, 67, 0.15)',
   yellow: '#FFD700'
@@ -56,6 +58,14 @@ export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [directionModalShop, setDirectionModalShop] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'shops' | 'products'>('shops');
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState('Home');
+
+  // Sample saved addresses (will later come from AsyncStorage)
+  const savedAddresses = [
+    { id: '1', name: 'Home', address: 'Binafsha ko\'chasi, 11', icon: 'home' as const },
+    { id: '2', name: 'Work', address: 'IT-Park, Tinchlik Street', icon: 'briefcase' as const },
+  ];
 
   // Animated scroll value
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -319,7 +329,7 @@ export default function HomeScreen() {
           }
         ]}>
           <View style={styles.locationBarBackground} />
-          <TouchableOpacity style={styles.locationBar}>
+          <TouchableOpacity style={styles.locationBar} onPress={() => setShowAddressModal(true)}>
             <View style={styles.locationIconBg}>
               <Ionicons name="location" size={14} color={COLORS.white} />
             </View>
@@ -493,6 +503,66 @@ export default function HomeScreen() {
         </View>
 
       </Animated.ScrollView>
+
+
+      {/* Address Picker Modal (like Uzum) */}
+      <Modal
+        visible={showAddressModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddressModal(false)}
+      >
+        <View style={styles.addressModalOverlay}>
+          <View style={styles.addressModalContent}>
+            {/* Handle bar */}
+            <View style={styles.modalHandle} />
+
+            {/* Header */}
+            <View style={styles.addressModalHeader}>
+              <Text style={styles.addressModalTitle}>Manzillar</Text>
+              <TouchableOpacity onPress={() => setShowAddressModal(false)}>
+                <Ionicons name="close" size={24} color={COLORS.dark} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Address List */}
+            <ScrollView style={styles.addressModalList}>
+              {savedAddresses.map((addr) => (
+                <TouchableOpacity
+                  key={addr.id}
+                  style={styles.addressModalItem}
+                  onPress={() => {
+                    setSelectedAddress(addr.name);
+                    setShowAddressModal(false);
+                  }}
+                >
+                  <View style={styles.addressModalIcon}>
+                    <Ionicons name={addr.icon} size={20} color={COLORS.dark} />
+                  </View>
+                  <View style={styles.addressModalInfo}>
+                    <Text style={styles.addressModalName}>{addr.name}</Text>
+                    <Text style={styles.addressModalAddress}>{addr.address}</Text>
+                  </View>
+                  <TouchableOpacity>
+                    <Ionicons name="create-outline" size={20} color={COLORS.gray} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Add New Address Button */}
+            <TouchableOpacity
+              style={styles.addAddressBtn}
+              onPress={() => {
+                setShowAddressModal(false);
+                router.push('/onboarding/location');
+              }}
+            >
+              <Text style={styles.addAddressBtnText}>Yangi manzil</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Direction Modal */}
       {directionModalShop && (
@@ -777,5 +847,85 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
   modalText: { marginBottom: 20, color: '#666' },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  modalBtn: { flex: 1, padding: 15, borderRadius: 10, alignItems: 'center' }
+  modalBtn: { flex: 1, padding: 15, borderRadius: 10, alignItems: 'center' },
+
+  // Address Picker Modal
+  addressModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'flex-end',
+  },
+  addressModalContent: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    paddingTop: 10,
+    paddingBottom: 40,
+    maxHeight: '70%',
+  },
+  modalHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 15,
+  },
+  addressModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  addressModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: COLORS.dark,
+  },
+  addressModalList: {
+    paddingHorizontal: 20,
+  },
+  addressModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  addressModalIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  addressModalInfo: {
+    flex: 1,
+  },
+  addressModalName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.dark,
+  },
+  addressModalAddress: {
+    fontSize: 14,
+    color: COLORS.gray,
+    marginTop: 2,
+  },
+  addAddressBtn: {
+    backgroundColor: COLORS.primary,
+    marginHorizontal: 20,
+    marginTop: 15,
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  addAddressBtnText: {
+    color: COLORS.white,
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
 });
