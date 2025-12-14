@@ -1,18 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
+    Dimensions,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const { height } = Dimensions.get('window');
 
 const COLORS = {
     background: '#FDF6E3',
@@ -35,13 +37,15 @@ const DEFAULT_LOCATION = {
 export default function LocationPickerScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const mapRef = useRef<MapView>(null);
     const [region, setRegion] = useState(DEFAULT_LOCATION);
-    const [selectedLocation, setSelectedLocation] = useState({
+    const [centerCoords, setCenterCoords] = useState({
         latitude: DEFAULT_LOCATION.latitude,
         longitude: DEFAULT_LOCATION.longitude,
     });
     const [address, setAddress] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isGeocoding, setIsGeocoding] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
@@ -68,7 +72,7 @@ export default function LocationPickerScreen() {
             };
 
             setRegion(newRegion);
-            setSelectedLocation({
+            setCenterCoords({
                 latitude: location.coords.latitude,
                 longitude: location.coords.longitude,
             });
@@ -83,6 +87,7 @@ export default function LocationPickerScreen() {
     };
 
     const reverseGeocode = async (lat: number, lng: number) => {
+        setIsGeocoding(true);
         try {
             const result = await Location.reverseGeocodeAsync({
                 latitude: lat,
@@ -102,18 +107,32 @@ export default function LocationPickerScreen() {
         } catch (error) {
             console.error('Error reverse geocoding:', error);
             setAddress('Address not found');
+        } finally {
+            setIsGeocoding(false);
         }
     };
 
-    const handleMapPress = async (e: any) => {
-        const { latitude, longitude } = e.nativeEvent.coordinate;
-        setSelectedLocation({ latitude, longitude });
-        await reverseGeocode(latitude, longitude);
+    // When map region changes (user drags the map), the center pin location updates
+    const handleRegionChange = async (newRegion: typeof region) => {
+        setRegion(newRegion);
+        setCenterCoords({
+            latitude: newRegion.latitude,
+            longitude: newRegion.longitude,
+        });
+    };
+
+    // After map stops moving, geocode the center location
+    const handleRegionChangeComplete = async (newRegion: typeof region) => {
+        setRegion(newRegion);
+        setCenterCoords({
+            latitude: newRegion.latitude,
+            longitude: newRegion.longitude,
+        });
+        await reverseGeocode(newRegion.latitude, newRegion.longitude);
     };
 
     const handleConfirmLocation = () => {
         if (!address) {
-            Alert.alert('Error', 'Please select a location');
             return;
         }
 
@@ -121,20 +140,29 @@ export default function LocationPickerScreen() {
         router.push({
             pathname: '/onboarding/address-details',
             params: {
-                latitude: selectedLocation.latitude,
-                longitude: selectedLocation.longitude,
+                latitude: centerCoords.latitude.toString(),
+                longitude: centerCoords.longitude.toString(),
                 address: address,
             },
         });
     };
 
-    const handleRecenter = () => {
-        getCurrentLocation();
+    const handleRecenter = async () => {
+        setIsLoading(true);
+        await getCurrentLocation();
+        if (mapRef.current && centerCoords) {
+            mapRef.current.animateToRegion({
+                ...centerCoords,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+            }, 500);
+        }
     };
 
     if (isLoading) {
         return (
             <View style={[styles.container, styles.loadingContainer]}>
+                <Stack.Screen options={{ headerShown: false }} />
                 <ActivityIndicator size="large" color={COLORS.primary} />
                 <Text style={styles.loadingText}>Getting your location...</Text>
             </View>
@@ -143,34 +171,31 @@ export default function LocationPickerScreen() {
 
     return (
         <View style={styles.container}>
+            {/* Hide the stack header */}
+            <Stack.Screen options={{ headerShown: false }} />
+
             {/* Map */}
             <MapView
+                ref={mapRef}
                 style={styles.map}
                 region={region}
-                onRegionChangeComplete={setRegion}
-                onPress={handleMapPress}
+                onRegionChange={handleRegionChange}
+                onRegionChangeComplete={handleRegionChangeComplete}
                 showsUserLocation
                 showsMyLocationButton={false}
-            >
-                <Marker
-                    coordinate={selectedLocation}
-                    draggable
-                    onDragEnd={(e) => {
-                        setSelectedLocation(e.nativeEvent.coordinate);
-                        reverseGeocode(
-                            e.nativeEvent.coordinate.latitude,
-                            e.nativeEvent.coordinate.longitude
-                        );
-                    }}
-                >
-                    <View style={styles.markerContainer}>
-                        <View style={styles.marker}>
-                            <Ionicons name="home" size={20} color={COLORS.white} />
-                        </View>
-                        <View style={styles.markerPointer} />
+            />
+
+            {/* Centered Pin - Always at middle of screen */}
+            <View style={styles.centerPinWrapper} pointerEvents="none">
+                <View style={styles.centerPin}>
+                    <View style={styles.pinHead}>
+                        <Ionicons name="location" size={22} color={COLORS.white} />
                     </View>
-                </Marker>
-            </MapView>
+                    <View style={styles.pinPointer} />
+                </View>
+                {/* Shadow under pin */}
+                <View style={styles.pinShadow} />
+            </View>
 
             {/* Top Bar */}
             <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
@@ -202,11 +227,15 @@ export default function LocationPickerScreen() {
                 <View style={styles.addressRow}>
                     <Ionicons name="location" size={20} color={COLORS.primary} />
                     <Text style={styles.addressText} numberOfLines={2}>
-                        {address || 'Tap on map to select location'}
+                        {isGeocoding ? 'Finding address...' : (address || 'Move the map to select location')}
                     </Text>
                 </View>
 
-                <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirmLocation}>
+                <TouchableOpacity
+                    style={[styles.confirmBtn, (!address || isGeocoding) && styles.confirmBtnDisabled]}
+                    onPress={handleConfirmLocation}
+                    disabled={!address || isGeocoding}
+                >
                     <Text style={styles.confirmBtnText}>Confirm Location</Text>
                 </TouchableOpacity>
             </View>
@@ -231,6 +260,54 @@ const styles = StyleSheet.create({
     map: {
         flex: 1,
     },
+    // Centered pin that stays in the middle of screen
+    centerPinWrapper: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        // Offset to account for bottom sheet height
+        marginBottom: 100,
+    },
+    centerPin: {
+        alignItems: 'center',
+    },
+    pinHead: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: COLORS.white,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 8,
+    },
+    pinPointer: {
+        width: 0,
+        height: 0,
+        borderLeftWidth: 10,
+        borderRightWidth: 10,
+        borderTopWidth: 16,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: COLORS.primary,
+        marginTop: -3,
+    },
+    pinShadow: {
+        width: 14,
+        height: 6,
+        borderRadius: 7,
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        marginTop: 4,
+    },
     topBar: {
         position: 'absolute',
         top: 0,
@@ -242,9 +319,9 @@ const styles = StyleSheet.create({
         paddingBottom: 15,
     },
     closeBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: COLORS.white,
         justifyContent: 'center',
         alignItems: 'center',
@@ -261,8 +338,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.white,
         marginLeft: 10,
         paddingHorizontal: 15,
-        height: 45,
-        borderRadius: 12,
+        height: 44,
+        borderRadius: 22,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -290,35 +367,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.15,
         shadowRadius: 6,
         elevation: 4,
-    },
-    markerContainer: {
-        alignItems: 'center',
-    },
-    marker: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 3,
-        borderColor: COLORS.white,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-        elevation: 5,
-    },
-    markerPointer: {
-        width: 0,
-        height: 0,
-        borderLeftWidth: 8,
-        borderRightWidth: 8,
-        borderTopWidth: 12,
-        borderLeftColor: 'transparent',
-        borderRightColor: 'transparent',
-        borderTopColor: COLORS.primary,
-        marginTop: -2,
     },
     bottomSheet: {
         position: 'absolute',
@@ -361,6 +409,9 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderRadius: 14,
         alignItems: 'center',
+    },
+    confirmBtnDisabled: {
+        opacity: 0.6,
     },
     confirmBtnText: {
         color: COLORS.white,

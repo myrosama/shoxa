@@ -8,6 +8,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -170,12 +171,25 @@ export default function ExploreScreen() {
             }}
             onPress={() => setSelectedShop(shop)}
           >
-            <View style={[styles.shopMarker, selectedShop?.id === shop.id && styles.shopMarkerSelected]}>
-              <Ionicons
-                name={shop.type === 'restaurant' ? 'restaurant' : shop.type === 'pharmacy' ? 'medkit' : 'storefront'}
-                size={16}
-                color={COLORS.white}
-              />
+            <View style={[styles.shopMarkerContainer, selectedShop?.id === shop.id && styles.shopMarkerContainerSelected]}>
+              {/* Profile image or fallback */}
+              <View style={styles.shopMarkerImage}>
+                {shop.logoUrl ? (
+                  <Image source={{ uri: shop.logoUrl }} style={styles.markerImageInner} />
+                ) : (
+                  <View style={styles.markerFallback}>
+                    <Ionicons name="storefront" size={18} color={COLORS.primary} />
+                  </View>
+                )}
+              </View>
+              {/* Type badge */}
+              <View style={styles.markerBadge}>
+                <Ionicons
+                  name={shop.type === 'restaurant' ? 'restaurant' : shop.type === 'pharmacy' ? 'medkit' : 'cart'}
+                  size={10}
+                  color={COLORS.white}
+                />
+              </View>
             </View>
           </Marker>
         ))}
@@ -201,7 +215,7 @@ export default function ExploreScreen() {
       </View>
 
       {/* Category Pills */}
-      <View style={styles.categoryContainer}>
+      <View style={[styles.categoryContainer, { top: insets.top + 60 }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
@@ -223,7 +237,7 @@ export default function ExploreScreen() {
       </View>
 
       {/* Right Controls */}
-      <View style={[styles.rightControls, { top: insets.top + 125 }]}>
+      <View style={[styles.rightControls, { top: insets.top + 120 }]}>
         <TouchableOpacity style={styles.controlBtn} onPress={toggle3D}>
           <Text style={styles.controlBtnText}>{is3D ? '2D' : '3D'}</Text>
         </TouchableOpacity>
@@ -232,7 +246,6 @@ export default function ExploreScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Selected Shop Card */}
       {selectedShop && (
         <View style={[styles.shopCard, { paddingBottom: insets.bottom + 100 }]}>
           <TouchableOpacity style={styles.closeCardBtn} onPress={() => setSelectedShop(null)}>
@@ -241,7 +254,11 @@ export default function ExploreScreen() {
 
           <View style={styles.shopCardContent}>
             <View style={styles.shopCardIcon}>
-              <Ionicons name="storefront" size={24} color={COLORS.primary} />
+              {selectedShop.logoUrl ? (
+                <Image source={{ uri: selectedShop.logoUrl }} style={styles.shopCardImage} />
+              ) : (
+                <Ionicons name="storefront" size={24} color={COLORS.primary} />
+              )}
             </View>
             <View style={styles.shopCardInfo}>
               <Text style={styles.shopCardName}>{selectedShop.name}</Text>
@@ -389,6 +406,58 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.primary,
   },
+  // Shop marker with profile image and badge
+  shopMarkerContainer: {
+    width: 48,
+    height: 48,
+    position: 'relative',
+  },
+  shopMarkerContainerSelected: {
+    transform: [{ scale: 1.15 }],
+  },
+  shopMarkerImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: COLORS.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  markerImageInner: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  markerFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  markerBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  // Keep old marker style as fallback
   shopMarker: {
     width: 36,
     height: 36,
@@ -442,6 +511,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
+    overflow: 'hidden',
+  },
+  shopCardImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
   },
   shopCardInfo: {
     flex: 1,
