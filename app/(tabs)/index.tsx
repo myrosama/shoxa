@@ -1,4 +1,5 @@
 import { db } from '@/configs/FirebaseConfig';
+import { useAddresses } from '@/contexts/AddressContext';
 import { useLocation } from '@/contexts/LocationContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -52,6 +53,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { calculateDistance } = useLocation();
+  const { addresses, selectedAddress, selectAddress, refreshAddresses } = useAddresses();
   const [shops, setShops] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,13 +61,34 @@ export default function HomeScreen() {
   const [directionModalShop, setDirectionModalShop] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'shops' | 'products'>('shops');
   const [showAddressModal, setShowAddressModal] = useState(false);
-  const [selectedAddress, setSelectedAddress] = useState('Home');
+  const modalFade = useRef(new Animated.Value(0)).current;
 
-  // Sample saved addresses (will later come from AsyncStorage)
-  const savedAddresses = [
-    { id: '1', name: 'Home', address: 'Binafsha ko\'chasi, 11', icon: 'home' as const },
-    { id: '2', name: 'Work', address: 'IT-Park, Tinchlik Street', icon: 'briefcase' as const },
-  ];
+  // Show/hide address modal with animation
+  const openAddressModal = () => {
+    setShowAddressModal(true);
+    Animated.timing(modalFade, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeAddressModal = () => {
+    Animated.timing(modalFade, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => setShowAddressModal(false));
+  };
+
+  // Get icon for address type
+  const getAddressIcon = (type: string) => {
+    switch (type) {
+      case 'home': return 'home';
+      case 'work': return 'briefcase';
+      default: return 'location';
+    }
+  };
 
   // Animated scroll value
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -329,12 +352,12 @@ export default function HomeScreen() {
           }
         ]}>
           <View style={styles.locationBarBackground} />
-          <TouchableOpacity style={styles.locationBar} onPress={() => setShowAddressModal(true)}>
+          <TouchableOpacity style={styles.locationBar} onPress={openAddressModal}>
             <View style={styles.locationIconBg}>
               <Ionicons name="location" size={14} color={COLORS.white} />
             </View>
             <Text style={styles.locationText} numberOfLines={1}>
-              Home • Tashkent City, Uzbekistan
+              {selectedAddress ? `${selectedAddress.name} • ${selectedAddress.address}` : 'Manzil tanlang'}
             </Text>
             <Ionicons name="chevron-down" size={14} color={COLORS.gray} />
           </TouchableOpacity>
@@ -506,63 +529,107 @@ export default function HomeScreen() {
 
 
       {/* Address Picker Modal (like Uzum) */}
-      <Modal
-        visible={showAddressModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowAddressModal(false)}
-      >
-        <View style={styles.addressModalOverlay}>
-          <View style={styles.addressModalContent}>
-            {/* Handle bar */}
-            <View style={styles.modalHandle} />
-
-            {/* Header */}
-            <View style={styles.addressModalHeader}>
-              <Text style={styles.addressModalTitle}>Manzillar</Text>
-              <TouchableOpacity onPress={() => setShowAddressModal(false)}>
-                <Ionicons name="close" size={24} color={COLORS.dark} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Address List */}
-            <ScrollView style={styles.addressModalList}>
-              {savedAddresses.map((addr) => (
-                <TouchableOpacity
-                  key={addr.id}
-                  style={styles.addressModalItem}
-                  onPress={() => {
-                    setSelectedAddress(addr.name);
-                    setShowAddressModal(false);
-                  }}
-                >
-                  <View style={styles.addressModalIcon}>
-                    <Ionicons name={addr.icon} size={20} color={COLORS.dark} />
-                  </View>
-                  <View style={styles.addressModalInfo}>
-                    <Text style={styles.addressModalName}>{addr.name}</Text>
-                    <Text style={styles.addressModalAddress}>{addr.address}</Text>
-                  </View>
-                  <TouchableOpacity>
-                    <Ionicons name="create-outline" size={20} color={COLORS.gray} />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Add New Address Button */}
+      {showAddressModal && (
+        <Modal
+          visible={true}
+          animationType="none"
+          transparent={true}
+          onRequestClose={closeAddressModal}
+        >
+          <Animated.View style={[styles.addressModalOverlay, { opacity: modalFade }]}>
             <TouchableOpacity
-              style={styles.addAddressBtn}
-              onPress={() => {
-                setShowAddressModal(false);
-                router.push('/onboarding/location');
-              }}
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={closeAddressModal}
+            />
+            <Animated.View
+              style={[
+                styles.addressModalContent,
+                {
+                  transform: [{
+                    translateY: modalFade.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [300, 0],
+                    }),
+                  }],
+                },
+              ]}
             >
-              <Text style={styles.addAddressBtnText}>Yangi manzil</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+              {/* Handle bar */}
+              <View style={styles.modalHandle} />
+
+              {/* Header */}
+              <View style={styles.addressModalHeader}>
+                <Text style={styles.addressModalTitle}>Manzillar</Text>
+                <TouchableOpacity onPress={closeAddressModal}>
+                  <Ionicons name="close" size={24} color={COLORS.dark} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Address List */}
+              <ScrollView style={styles.addressModalList}>
+                {addresses.length === 0 ? (
+                  <View style={styles.emptyAddressContainer}>
+                    <Ionicons name="location-outline" size={48} color={COLORS.gray} />
+                    <Text style={styles.emptyAddressText}>Saqlangan manzil yo'q</Text>
+                    <Text style={styles.emptyAddressSubtext}>Yangi manzil qo'shing</Text>
+                  </View>
+                ) : (
+                  addresses.map((addr) => (
+                    <TouchableOpacity
+                      key={addr.id}
+                      style={[
+                        styles.addressModalItem,
+                        selectedAddress?.id === addr.id && styles.addressModalItemSelected
+                      ]}
+                      onPress={() => {
+                        selectAddress(addr.id);
+                        closeAddressModal();
+                      }}
+                    >
+                      <View style={[
+                        styles.addressModalIcon,
+                        selectedAddress?.id === addr.id && styles.addressModalIconSelected
+                      ]}>
+                        <Ionicons
+                          name={getAddressIcon(addr.type) as any}
+                          size={20}
+                          color={selectedAddress?.id === addr.id ? COLORS.white : COLORS.dark}
+                        />
+                      </View>
+                      <View style={styles.addressModalInfo}>
+                        <Text style={styles.addressModalName}>{addr.name}</Text>
+                        <Text style={styles.addressModalAddress} numberOfLines={1}>{addr.address}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.editAddressBtn}
+                        onPress={() => {
+                          closeAddressModal();
+                          // TODO: Navigate to edit address
+                        }}
+                      >
+                        <Ionicons name="create-outline" size={20} color={COLORS.gray} />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+
+              {/* Add New Address Button */}
+              <TouchableOpacity
+                style={styles.addAddressBtn}
+                onPress={() => {
+                  closeAddressModal();
+                  router.push('/onboarding/location');
+                }}
+              >
+                <Ionicons name="add" size={22} color={COLORS.white} style={{ marginRight: 8 }} />
+                <Text style={styles.addAddressBtnText}>Yangi manzil</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
+      )}
 
       {/* Direction Modal */}
       {directionModalShop && (
@@ -927,5 +994,34 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 17,
     fontWeight: 'bold',
+  },
+  // Empty address state
+  emptyAddressContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyAddressText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.dark,
+    marginTop: 15,
+  },
+  emptyAddressSubtext: {
+    fontSize: 14,
+    color: COLORS.gray,
+    marginTop: 5,
+  },
+  // Selected address state
+  addressModalItemSelected: {
+    backgroundColor: 'rgba(198, 124, 67, 0.1)',
+    borderRadius: 12,
+    marginHorizontal: -10,
+    paddingHorizontal: 10,
+  },
+  addressModalIconSelected: {
+    backgroundColor: COLORS.primary,
+  },
+  editAddressBtn: {
+    padding: 8,
   },
 });

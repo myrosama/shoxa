@@ -183,19 +183,20 @@ export default function ExploreScreen() {
 
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
-        </TouchableOpacity>
-
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={18} color={COLORS.gray} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search shops..."
+            placeholder="Search shops, products..."
             placeholderTextColor={COLORS.gray}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
+              <Ionicons name="close-circle" size={18} color={COLORS.gray} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -222,7 +223,7 @@ export default function ExploreScreen() {
       </View>
 
       {/* Right Controls */}
-      <View style={styles.rightControls}>
+      <View style={[styles.rightControls, { top: insets.top + 125 }]}>
         <TouchableOpacity style={styles.controlBtn} onPress={toggle3D}>
           <Text style={styles.controlBtnText}>{is3D ? '2D' : '3D'}</Text>
         </TouchableOpacity>
@@ -326,9 +327,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.dark,
   },
+  clearSearchBtn: {
+    padding: 4,
+  },
   categoryContainer: {
     position: 'absolute',
-    top: 110,
+    top: 70,
     left: 0,
     right: 0,
   },

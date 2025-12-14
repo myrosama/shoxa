@@ -41,12 +41,6 @@ export default function ProfileScreen() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-    // Saved addresses (will be moved to context later)
-    const savedAddresses = [
-        { id: '1', name: 'Home', address: 'Binafsha ko\'chasi, 11', icon: 'home' as const },
-        { id: '2', name: 'Work', address: 'IT-Park, Tinchlik Street', icon: 'briefcase' as const },
-    ];
-
     const handleLogin = () => {
         router.push('/auth/login');
     };
@@ -116,30 +110,6 @@ export default function ProfileScreen() {
                             <Text style={styles.signInBtnText}>Sign In</Text>
                         </TouchableOpacity>
                     )}
-                </View>
-
-                {/* Saved Addresses */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Saved Addresses</Text>
-                        <TouchableOpacity onPress={() => router.push('/onboarding/location')}>
-                            <Text style={styles.sectionAction}>Add New</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.addressList}>
-                        {savedAddresses.map((addr) => (
-                            <TouchableOpacity key={addr.id} style={styles.addressItem}>
-                                <View style={styles.addressIcon}>
-                                    <Ionicons name={addr.icon} size={20} color={COLORS.primary} />
-                                </View>
-                                <View style={styles.addressContent}>
-                                    <Text style={styles.addressName}>{addr.name}</Text>
-                                    <Text style={styles.addressText} numberOfLines={1}>{addr.address}</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
-                            </TouchableOpacity>
-                        ))}
-                    </View>
                 </View>
 
                 {/* Account Section (only if logged in) */}

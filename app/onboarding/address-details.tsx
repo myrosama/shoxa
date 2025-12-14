@@ -1,5 +1,5 @@
+import { useAddresses } from '@/contexts/AddressContext';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -36,13 +36,14 @@ const LOCATION_TYPES = [
 export default function AddressDetailsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { addAddress } = useAddresses();
     const params = useLocalSearchParams<{
         latitude: string;
         longitude: string;
         address: string;
     }>();
 
-    const [locationType, setLocationType] = useState('home');
+    const [locationType, setLocationType] = useState<'home' | 'work' | 'other'>('home');
     const [addressName, setAddressName] = useState('Uy');
     const [entrance, setEntrance] = useState('');
     const [floor, setFloor] = useState('');
@@ -59,32 +60,17 @@ export default function AddressDetailsScreen() {
         setIsSaving(true);
 
         try {
-            const newAddress = {
-                id: Date.now().toString(),
+            await addAddress({
                 type: locationType,
                 name: addressName,
-                address: params.address,
+                address: params.address || '',
                 latitude: parseFloat(params.latitude || '0'),
                 longitude: parseFloat(params.longitude || '0'),
                 entrance,
                 floor,
                 apartment,
                 courierNote,
-                createdAt: new Date().toISOString(),
-            };
-
-            // Get existing addresses
-            const existingAddresses = await AsyncStorage.getItem('savedAddresses');
-            const addresses = existingAddresses ? JSON.parse(existingAddresses) : [];
-
-            // Add new address
-            addresses.push(newAddress);
-
-            // Save to AsyncStorage
-            await AsyncStorage.setItem('savedAddresses', JSON.stringify(addresses));
-
-            // Mark onboarding as complete
-            await AsyncStorage.setItem('onboardingComplete', 'true');
+            });
 
             Alert.alert(
                 'Address Saved!',
@@ -148,7 +134,7 @@ export default function AddressDetailsScreen() {
                                                 locationType === type.id && styles.locationTypeBtnActive,
                                             ]}
                                             onPress={() => {
-                                                setLocationType(type.id);
+                                                setLocationType(type.id as 'home' | 'work' | 'other');
                                                 setAddressName(type.label === 'Home' ? 'Uy' : type.label === 'Work' ? 'Ish' : '');
                                             }}
                                         >
