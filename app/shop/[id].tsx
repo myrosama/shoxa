@@ -1,6 +1,7 @@
 import { getTelegramImageUrl } from '@/configs/AppConfig';
 import { db } from '@/configs/FirebaseConfig';
 import { useCart } from '@/contexts/CartContext';
+import { useLocation } from '@/contexts/LocationContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';

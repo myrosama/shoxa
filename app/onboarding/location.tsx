@@ -38,7 +38,7 @@ export default function LocationPickerScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const mapRef = useRef<MapView>(null);
-    const geocodeTimeout = useRef<NodeJS.Timeout | null>(null);
+    const geocodeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [region, setRegion] = useState(DEFAULT_LOCATION);
     const [centerCoords, setCenterCoords] = useState({
@@ -65,6 +65,7 @@ export default function LocationPickerScreen() {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 setIsLoading(false);
+                setAddress('Location permission denied');
                 return;
             }
 
@@ -91,6 +92,7 @@ export default function LocationPickerScreen() {
         } catch (error) {
             console.error('Error getting location:', error);
             setIsLoading(false);
+            setAddress('Could not get location');
         }
     };
 
@@ -110,45 +112,50 @@ export default function LocationPickerScreen() {
                     addr.district,
                     addr.city,
                 ].filter(Boolean).join(', ');
-                setAddress(formattedAddress || 'Address not found');
+                setAddress(formattedAddress || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+            } else {
+                setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
             }
         } catch (error) {
             console.error('Error reverse geocoding:', error);
-            setAddress('Address not found');
+            // Fallback to coordinates
+            setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
         } finally {
             setIsGeocoding(false);
+            setIsDragging(false);
         }
     };
 
-    // Debounced geocoding - only geocode after user stops moving for 500ms
+    // Debounced geocoding - only geocode after user stops moving for 400ms
     const debouncedGeocode = useCallback((lat: number, lng: number) => {
         if (geocodeTimeout.current) {
             clearTimeout(geocodeTimeout.current);
         }
         geocodeTimeout.current = setTimeout(() => {
             reverseGeocode(lat, lng);
-        }, 500);
+        }, 400);
     }, []);
 
     // Smooth region change - don't geocode during movement
     const handleRegionChange = () => {
-        setIsDragging(true);
+        if (!isDragging) {
+            setIsDragging(true);
+        }
     };
 
     // After map stops moving, geocode the center location with debounce
     const handleRegionChangeComplete = (newRegion: typeof region) => {
-        setIsDragging(false);
         setRegion(newRegion);
         setCenterCoords({
             latitude: newRegion.latitude,
             longitude: newRegion.longitude,
         });
-        // Debounced geocode
+        // Debounced geocode - isDragging will be set to false after geocoding completes
         debouncedGeocode(newRegion.latitude, newRegion.longitude);
     };
 
     const handleConfirmLocation = () => {
-        if (!address) {
+        if (!address || isDragging || isGeocoding) {
             return;
         }
 
@@ -193,6 +200,15 @@ export default function LocationPickerScreen() {
             </View>
         );
     }
+
+    // Determine what to show in address field
+    const getAddressDisplay = () => {
+        if (isDragging) return 'Move the map...';
+        if (isGeocoding) return 'Finding address...';
+        return address || 'Select a location';
+    };
+
+    const isButtonEnabled = !isDragging && !isGeocoding && address.length > 0;
 
     return (
         <View style={styles.container}>
@@ -256,14 +272,14 @@ export default function LocationPickerScreen() {
                 <View style={styles.addressRow}>
                     <Ionicons name="location" size={20} color={COLORS.primary} />
                     <Text style={styles.addressText} numberOfLines={2}>
-                        {isDragging ? 'Move the map...' : (isGeocoding ? 'Finding address...' : (address || 'Move the map to select location'))}
+                        {getAddressDisplay()}
                     </Text>
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.confirmBtn, (!address || isGeocoding || isDragging) && styles.confirmBtnDisabled]}
+                    style={[styles.confirmBtn, !isButtonEnabled && styles.confirmBtnDisabled]}
                     onPress={handleConfirmLocation}
-                    disabled={!address || isGeocoding || isDragging}
+                    disabled={!isButtonEnabled}
                 >
                     <Text style={styles.confirmBtnText}>Confirm Location</Text>
                 </TouchableOpacity>
