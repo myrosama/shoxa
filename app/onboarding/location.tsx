@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
@@ -38,6 +38,8 @@ export default function LocationPickerScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const mapRef = useRef<MapView>(null);
+    const geocodeTimeout = useRef<NodeJS.Timeout | null>(null);
+
     const [region, setRegion] = useState(DEFAULT_LOCATION);
     const [centerCoords, setCenterCoords] = useState({
         latitude: DEFAULT_LOCATION.latitude,
@@ -46,10 +48,16 @@ export default function LocationPickerScreen() {
     const [address, setAddress] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isGeocoding, setIsGeocoding] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         getCurrentLocation();
+        return () => {
+            if (geocodeTimeout.current) {
+                clearTimeout(geocodeTimeout.current);
+            }
+        };
     }, []);
 
     const getCurrentLocation = async () => {
@@ -112,23 +120,31 @@ export default function LocationPickerScreen() {
         }
     };
 
-    // When map region changes (user drags the map), the center pin location updates
-    const handleRegionChange = async (newRegion: typeof region) => {
-        setRegion(newRegion);
-        setCenterCoords({
-            latitude: newRegion.latitude,
-            longitude: newRegion.longitude,
-        });
+    // Debounced geocoding - only geocode after user stops moving for 500ms
+    const debouncedGeocode = useCallback((lat: number, lng: number) => {
+        if (geocodeTimeout.current) {
+            clearTimeout(geocodeTimeout.current);
+        }
+        geocodeTimeout.current = setTimeout(() => {
+            reverseGeocode(lat, lng);
+        }, 500);
+    }, []);
+
+    // Smooth region change - don't geocode during movement
+    const handleRegionChange = () => {
+        setIsDragging(true);
     };
 
-    // After map stops moving, geocode the center location
-    const handleRegionChangeComplete = async (newRegion: typeof region) => {
+    // After map stops moving, geocode the center location with debounce
+    const handleRegionChangeComplete = (newRegion: typeof region) => {
+        setIsDragging(false);
         setRegion(newRegion);
         setCenterCoords({
             latitude: newRegion.latitude,
             longitude: newRegion.longitude,
         });
-        await reverseGeocode(newRegion.latitude, newRegion.longitude);
+        // Debounced geocode
+        debouncedGeocode(newRegion.latitude, newRegion.longitude);
     };
 
     const handleConfirmLocation = () => {
@@ -148,14 +164,23 @@ export default function LocationPickerScreen() {
     };
 
     const handleRecenter = async () => {
-        setIsLoading(true);
-        await getCurrentLocation();
-        if (mapRef.current && centerCoords) {
-            mapRef.current.animateToRegion({
-                ...centerCoords,
+        try {
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            });
+
+            const newRegion = {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
                 latitudeDelta: 0.005,
                 longitudeDelta: 0.005,
-            }, 500);
+            };
+
+            if (mapRef.current) {
+                mapRef.current.animateToRegion(newRegion, 500);
+            }
+        } catch (error) {
+            console.error('Error getting location:', error);
         }
     };
 
@@ -174,27 +199,31 @@ export default function LocationPickerScreen() {
             {/* Hide the stack header */}
             <Stack.Screen options={{ headerShown: false }} />
 
-            {/* Map */}
+            {/* Map - smooth scrolling enabled */}
             <MapView
                 ref={mapRef}
                 style={styles.map}
-                region={region}
+                initialRegion={region}
                 onRegionChange={handleRegionChange}
                 onRegionChangeComplete={handleRegionChangeComplete}
                 showsUserLocation
                 showsMyLocationButton={false}
+                scrollEnabled={true}
+                zoomEnabled={true}
+                pitchEnabled={false}
+                rotateEnabled={false}
             />
 
             {/* Centered Pin - Always at middle of screen */}
             <View style={styles.centerPinWrapper} pointerEvents="none">
-                <View style={styles.centerPin}>
-                    <View style={styles.pinHead}>
+                <View style={[styles.centerPin, isDragging && styles.centerPinDragging]}>
+                    <View style={[styles.pinHead, isDragging && styles.pinHeadDragging]}>
                         <Ionicons name="location" size={22} color={COLORS.white} />
                     </View>
-                    <View style={styles.pinPointer} />
+                    <View style={[styles.pinPointer, isDragging && styles.pinPointerDragging]} />
                 </View>
                 {/* Shadow under pin */}
-                <View style={styles.pinShadow} />
+                <View style={[styles.pinShadow, isDragging && styles.pinShadowDragging]} />
             </View>
 
             {/* Top Bar */}
@@ -227,14 +256,14 @@ export default function LocationPickerScreen() {
                 <View style={styles.addressRow}>
                     <Ionicons name="location" size={20} color={COLORS.primary} />
                     <Text style={styles.addressText} numberOfLines={2}>
-                        {isGeocoding ? 'Finding address...' : (address || 'Move the map to select location')}
+                        {isDragging ? 'Move the map...' : (isGeocoding ? 'Finding address...' : (address || 'Move the map to select location'))}
                     </Text>
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.confirmBtn, (!address || isGeocoding) && styles.confirmBtnDisabled]}
+                    style={[styles.confirmBtn, (!address || isGeocoding || isDragging) && styles.confirmBtnDisabled]}
                     onPress={handleConfirmLocation}
-                    disabled={!address || isGeocoding}
+                    disabled={!address || isGeocoding || isDragging}
                 >
                     <Text style={styles.confirmBtnText}>Confirm Location</Text>
                 </TouchableOpacity>
@@ -275,6 +304,9 @@ const styles = StyleSheet.create({
     centerPin: {
         alignItems: 'center',
     },
+    centerPinDragging: {
+        transform: [{ translateY: -10 }],
+    },
     pinHead: {
         width: 48,
         height: 48,
@@ -290,6 +322,9 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
         elevation: 8,
     },
+    pinHeadDragging: {
+        transform: [{ scale: 1.1 }],
+    },
     pinPointer: {
         width: 0,
         height: 0,
@@ -301,12 +336,21 @@ const styles = StyleSheet.create({
         borderTopColor: COLORS.primary,
         marginTop: -3,
     },
+    pinPointerDragging: {
+        opacity: 0.7,
+    },
     pinShadow: {
         width: 14,
         height: 6,
         borderRadius: 7,
         backgroundColor: 'rgba(0,0,0,0.2)',
         marginTop: 4,
+    },
+    pinShadowDragging: {
+        width: 20,
+        height: 8,
+        marginTop: 14,
+        opacity: 0.5,
     },
     topBar: {
         position: 'absolute',
