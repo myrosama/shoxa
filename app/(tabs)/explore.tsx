@@ -12,6 +12,7 @@ import {
   Dimensions,
   Image,
   Linking,
+  PanResponder,
   Platform,
   ScrollView,
   StyleSheet,
@@ -52,11 +53,16 @@ const DEFAULT_REGION = {
   longitudeDelta: 0.05,
 };
 
-// Zoomed out region for category browse
 const ZOOMED_OUT_DELTA = {
   latitudeDelta: 0.15,
   longitudeDelta: 0.15,
 };
+
+// Sheet heights
+const NEARBY_COLLAPSED = 60; // Just peek 10%
+const NEARBY_EXPANDED = 220;
+const CATEGORY_COLLAPSED = 80;
+const CATEGORY_EXPANDED = height * 0.5;
 
 interface Shop {
   id: string;
@@ -85,8 +91,79 @@ export default function ExploreScreen() {
   const [is3D, setIs3D] = useState(true);
   const [isCategoryBrowse, setIsCategoryBrowse] = useState(false);
 
-  // Animation for bottom sheet
-  const sheetAnim = useRef(new Animated.Value(0)).current;
+  // Animations for sheets
+  const nearbyHeight = useRef(new Animated.Value(NEARBY_EXPANDED)).current;
+  const categoryHeight = useRef(new Animated.Value(CATEGORY_EXPANDED)).current;
+  const [nearbyExpanded, setNearbyExpanded] = useState(true);
+  const [categoryExpanded, setCategoryExpanded] = useState(true);
+
+  // Pan responders
+  const nearbyPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0 && nearbyExpanded) {
+          // Dragging down from expanded
+          nearbyHeight.setValue(Math.max(NEARBY_COLLAPSED, NEARBY_EXPANDED - gs.dy));
+        } else if (gs.dy < 0 && !nearbyExpanded) {
+          // Dragging up from collapsed
+          nearbyHeight.setValue(Math.min(NEARBY_EXPANDED, NEARBY_COLLAPSED - gs.dy));
+        }
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (Math.abs(gs.dy) > 30) {
+          if (gs.dy > 0) {
+            // Swipe down - collapse
+            Animated.spring(nearbyHeight, { toValue: NEARBY_COLLAPSED, useNativeDriver: false, friction: 8 }).start();
+            setNearbyExpanded(false);
+          } else {
+            // Swipe up - expand
+            Animated.spring(nearbyHeight, { toValue: NEARBY_EXPANDED, useNativeDriver: false, friction: 8 }).start();
+            setNearbyExpanded(true);
+          }
+        } else {
+          // Snap back
+          Animated.spring(nearbyHeight, {
+            toValue: nearbyExpanded ? NEARBY_EXPANDED : NEARBY_COLLAPSED,
+            useNativeDriver: false,
+            friction: 8,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const categoryPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0 && categoryExpanded) {
+          categoryHeight.setValue(Math.max(CATEGORY_COLLAPSED, CATEGORY_EXPANDED - gs.dy));
+        } else if (gs.dy < 0 && !categoryExpanded) {
+          categoryHeight.setValue(Math.min(CATEGORY_EXPANDED, CATEGORY_COLLAPSED - gs.dy));
+        }
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (Math.abs(gs.dy) > 40) {
+          if (gs.dy > 0) {
+            Animated.spring(categoryHeight, { toValue: CATEGORY_COLLAPSED, useNativeDriver: false, friction: 8 }).start();
+            setCategoryExpanded(false);
+          } else {
+            Animated.spring(categoryHeight, { toValue: CATEGORY_EXPANDED, useNativeDriver: false, friction: 8 }).start();
+            setCategoryExpanded(true);
+          }
+        } else {
+          Animated.spring(categoryHeight, {
+            toValue: categoryExpanded ? CATEGORY_EXPANDED : CATEGORY_COLLAPSED,
+            useNativeDriver: false,
+            friction: 8,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     getCurrentLocation();
@@ -106,7 +183,7 @@ export default function ExploreScreen() {
           type: data.type || 'shop',
           latitude: data.latitude || data.location?.lat,
           longitude: data.longitude || data.location?.lng,
-          logoUrl,
+          logoUrl: logoUrl || undefined,
           rating: data.rating || 4.5,
           isOpen: data.isOpen !== false,
           openingHours: data.openingHours,
@@ -158,16 +235,12 @@ export default function ExploreScreen() {
     }
   };
 
-  // Handle category selection - zoom out and show list
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategory(categoryId);
     setSelectedShop(null);
 
     if (categoryId === 'all') {
-      // Exit category browse mode
       setIsCategoryBrowse(false);
-      Animated.timing(sheetAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-      // Zoom back to user location
       if (userLocation && mapRef.current) {
         mapRef.current.animateToRegion({
           ...userLocation,
@@ -176,12 +249,15 @@ export default function ExploreScreen() {
         }, 500);
       }
     } else {
-      // Enter category browse mode - zoom out
       setIsCategoryBrowse(true);
-      Animated.spring(sheetAnim, { toValue: 1, useNativeDriver: true, friction: 8 }).start();
+      setCategoryExpanded(true);
+      Animated.spring(categoryHeight, { toValue: CATEGORY_EXPANDED, useNativeDriver: false, friction: 8 }).start();
+
+      // Zoom out centered on user location
       if (mapRef.current && userLocation) {
         mapRef.current.animateToRegion({
-          ...userLocation,
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
           ...ZOOMED_OUT_DELTA,
         }, 500);
       }
@@ -191,7 +267,6 @@ export default function ExploreScreen() {
   const handleSelectShop = (shop: Shop) => {
     setSelectedShop(shop);
     setIsCategoryBrowse(false);
-    Animated.timing(sheetAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
 
     if (mapRef.current && shop.latitude && shop.longitude) {
       mapRef.current.animateToRegion({
@@ -210,7 +285,6 @@ export default function ExploreScreen() {
   const handleCloseCategoryBrowse = () => {
     setIsCategoryBrowse(false);
     setSelectedCategory('all');
-    Animated.timing(sheetAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     if (userLocation && mapRef.current) {
       mapRef.current.animateToRegion({
         ...userLocation,
@@ -284,7 +358,6 @@ export default function ExploreScreen() {
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         {isCategoryBrowse ? (
-          // Category browse header
           <View style={styles.categoryHeader}>
             <Text style={styles.categoryHeaderText}>{getCategoryLabel()}</Text>
             <TouchableOpacity style={styles.categoryCloseBtn} onPress={handleCloseCategoryBrowse}>
@@ -292,7 +365,6 @@ export default function ExploreScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          // Normal search bar
           <TouchableOpacity
             style={styles.searchBar}
             onPress={() => router.push('/map-search')}
@@ -335,20 +407,17 @@ export default function ExploreScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Shop Card - Simple & Clean - 45% height */}
+      {/* Shop Card - Compact */}
       {selectedShop && !isCategoryBrowse && (
         <View style={[styles.shopCard, { paddingBottom: insets.bottom + 20 }]}>
-          {/* Close Button */}
           <TouchableOpacity style={styles.closeBtn} onPress={handleCloseCard}>
             <Ionicons name="close" size={18} color={COLORS.gray} />
           </TouchableOpacity>
 
-          {/* Directions button - right side */}
           <TouchableOpacity style={styles.directionsBtn} onPress={handleDirections}>
             <Ionicons name="navigate" size={20} color={COLORS.primary} />
           </TouchableOpacity>
 
-          {/* Header Row */}
           <View style={styles.cardHeader}>
             <View style={styles.shopLogo}>
               {selectedShop.logoUrl ? (
@@ -381,7 +450,6 @@ export default function ExploreScreen() {
             </View>
           </View>
 
-          {/* View Shop Button */}
           <TouchableOpacity
             style={styles.viewShopBtn}
             onPress={() => router.push(`/shop/${selectedShop.id}`)}
@@ -392,31 +460,28 @@ export default function ExploreScreen() {
         </View>
       )}
 
-      {/* Category Browse Sheet - List of filtered shops */}
+      {/* Category Browse Sheet - Draggable */}
       {isCategoryBrowse && (
         <Animated.View
           style={[
             styles.categorySheet,
             {
-              paddingBottom: insets.bottom + 100,
-              transform: [{
-                translateY: sheetAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [300, 0],
-                })
-              }]
+              height: categoryHeight,
+              paddingBottom: insets.bottom + 20,
             }
           ]}
         >
+          {/* Drag Handle */}
+          <View {...categoryPan.panHandlers} style={styles.dragHandle}>
+            <View style={styles.dragBar} />
+          </View>
+
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{getCategoryLabel()}</Text>
-            <View style={styles.sheetFilters}>
-              <TouchableOpacity style={styles.filterBtn}>
-                <Text style={styles.filterText}>Open Now</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.filterBtn}>
-                <Text style={styles.filterText}>Sort by Distance</Text>
-                <Ionicons name="chevron-down" size={16} color={COLORS.dark} />
+            <View style={styles.sheetActions}>
+              <TouchableOpacity style={styles.filterChip}>
+                <Ionicons name="funnel-outline" size={14} color={COLORS.primary} />
+                <Text style={styles.filterText}>Filters</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -425,57 +490,73 @@ export default function ExploreScreen() {
             {filteredShops.map((shop) => (
               <TouchableOpacity
                 key={shop.id}
-                style={styles.listItem}
+                style={styles.listCard}
                 onPress={() => handleSelectShop(shop)}
               >
-                <View style={styles.listItemLogo}>
+                <View style={styles.listLogo}>
                   {shop.logoUrl ? (
-                    <Image source={{ uri: shop.logoUrl }} style={styles.listItemLogoImg} />
+                    <Image source={{ uri: shop.logoUrl }} style={styles.listLogoImg} />
                   ) : (
-                    <Ionicons name="storefront" size={22} color={COLORS.primary} />
+                    <Ionicons name="storefront" size={20} color={COLORS.primary} />
                   )}
                 </View>
-                <View style={styles.listItemInfo}>
-                  <Text style={styles.listItemName}>{shop.name}</Text>
-                  <Text style={styles.listItemMeta}>
-                    {shop.type} • {shop.latitude && shop.longitude
-                      ? calculateDistance(shop.latitude, shop.longitude)
-                      : '--'}
-                  </Text>
-                  <View style={styles.listItemStatus}>
-                    <View style={[styles.statusDotSmall, { backgroundColor: shop.isOpen ? COLORS.green : COLORS.red }]} />
-                    <Text style={[styles.statusTextSmall, { color: shop.isOpen ? COLORS.green : COLORS.red }]}>
-                      {shop.isOpen ? 'Open' : 'Closed'}
+                <View style={styles.listContent}>
+                  <Text style={styles.listName}>{shop.name}</Text>
+                  <View style={styles.listMeta}>
+                    <Ionicons name="star" size={12} color="#FFB800" />
+                    <Text style={styles.listRating}>{shop.rating}</Text>
+                    <Text style={styles.listDot}>•</Text>
+                    <Text style={styles.listDistance}>
+                      {shop.latitude && shop.longitude
+                        ? calculateDistance(shop.latitude, shop.longitude)
+                        : '--'}
                     </Text>
                   </View>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.lightGray} />
+                <View style={[styles.statusBadge, { backgroundColor: shop.isOpen ? COLORS.green : COLORS.red }]}>
+                  <Text style={styles.statusBadgeText}>{shop.isOpen ? 'Open' : 'Closed'}</Text>
+                </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </Animated.View>
       )}
 
-      {/* Nearby - Only when not in category browse and no shop selected */}
+      {/* Nearby - Compact & Draggable */}
       {!selectedShop && !isCategoryBrowse && filteredShops.length > 0 && (
-        <View style={[styles.nearbyCard, { paddingBottom: insets.bottom + 100 }]}>
-          <Text style={styles.nearbyTitle}>Nearby</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {filteredShops.slice(0, 6).map((shop) => (
-              <TouchableOpacity key={shop.id} style={styles.nearbyItem} onPress={() => handleSelectShop(shop)}>
-                <View style={styles.nearbyLogo}>
-                  {shop.logoUrl ? (
-                    <Image source={{ uri: shop.logoUrl }} style={styles.nearbyLogoImg} />
-                  ) : (
-                    <Ionicons name="storefront" size={22} color={COLORS.primary} />
-                  )}
-                </View>
-                <Text style={styles.nearbyName} numberOfLines={1}>{shop.name}</Text>
-                <Text style={styles.nearbyType}>{shop.type}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        <Animated.View style={[styles.nearbySheet, { height: nearbyHeight, paddingBottom: insets.bottom + 20 }]}>
+          {/* Drag Handle */}
+          <View {...nearbyPan.panHandlers} style={styles.dragHandle}>
+            <View style={styles.dragBar} />
+          </View>
+
+          <View style={styles.nearbyHeader}>
+            <Ionicons name="location" size={18} color={COLORS.primary} />
+            <Text style={styles.nearbyTitle}>Nearby</Text>
+            <Text style={styles.nearbyCount}>{filteredShops.length}</Text>
+          </View>
+
+          {nearbyExpanded && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.nearbyScroll}>
+              {filteredShops.slice(0, 8).map((shop) => (
+                <TouchableOpacity key={shop.id} style={styles.nearbyCard} onPress={() => handleSelectShop(shop)}>
+                  <View style={styles.nearbyLogo}>
+                    {shop.logoUrl ? (
+                      <Image source={{ uri: shop.logoUrl }} style={styles.nearbyLogoImg} />
+                    ) : (
+                      <Ionicons name="storefront" size={18} color={COLORS.primary} />
+                    )}
+                  </View>
+                  <Text style={styles.nearbyName} numberOfLines={1}>{shop.name}</Text>
+                  <View style={styles.nearbyBadge}>
+                    <Ionicons name="star" size={10} color="#FFB800" />
+                    <Text style={styles.nearbyRating}>{shop.rating}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </Animated.View>
       )}
 
       {isLoading && (
@@ -491,7 +572,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   map: { flex: 1 },
 
-  // Top Bar
   topBar: {
     position: 'absolute',
     top: 0,
@@ -542,7 +622,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // Categories
   categoryWrap: { position: 'absolute', left: 0, right: 0 },
   categoryScroll: { paddingHorizontal: 15, gap: 8 },
   categoryPill: {
@@ -563,7 +642,6 @@ const styles = StyleSheet.create({
   categoryText: { fontSize: 13, fontWeight: '600', color: COLORS.primary },
   categoryTextActive: { color: COLORS.white },
 
-  // Right Controls
   rightControls: { position: 'absolute', right: 15, gap: 10 },
   controlBtn: {
     width: 44,
@@ -580,7 +658,6 @@ const styles = StyleSheet.create({
   },
   controlBtnText: { fontSize: 13, fontWeight: 'bold', color: COLORS.primary },
 
-  // Markers
   markerWrap: { width: 48, height: 48, position: 'relative' },
   markerWrapSelected: { transform: [{ scale: 1.15 }] },
   markerImage: {
@@ -614,10 +691,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.white,
   },
 
-  // Shop Card - 45% height, simple
+  // Shop Card
   shopCard: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 110,
     left: 0,
     right: 0,
     height: height * 0.22,
@@ -714,7 +791,6 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 13, fontWeight: '500' },
   distanceText: { fontSize: 13, color: COLORS.gray, marginLeft: 4 },
 
-  // View Shop Button
   viewShopBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -730,13 +806,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Category Browse Sheet
+  // Category Sheet - Sleek & Draggable
   categorySheet: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 110,
     left: 0,
     right: 0,
-    height: height * 0.45,
     backgroundColor: COLORS.cream,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -746,9 +821,19 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 12,
   },
+  dragHandle: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  dragBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.lightGray,
+  },
   sheetHeader: {
-    padding: 20,
-    paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
   },
@@ -756,132 +841,167 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.dark,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  sheetFilters: {
+  sheetActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
-  filterBtn: {
+  filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryLight,
     gap: 4,
   },
   filterText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: COLORS.dark,
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
   sheetList: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingTop: 12,
   },
-  listItem: {
+  listCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  listItemLogo: {
-    width: 50,
-    height: 50,
+  listLogo: {
+    width: 44,
+    height: 44,
     borderRadius: 12,
     backgroundColor: COLORS.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: 12,
     overflow: 'hidden',
   },
-  listItemLogoImg: {
-    width: 50,
-    height: 50,
+  listLogoImg: {
+    width: 44,
+    height: 44,
     borderRadius: 12,
   },
-  listItemInfo: { flex: 1 },
-  listItemName: {
-    fontSize: 16,
+  listContent: { flex: 1 },
+  listName: {
+    fontSize: 15,
     fontWeight: '600',
     color: COLORS.dark,
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  listItemMeta: {
-    fontSize: 13,
-    color: COLORS.gray,
-    textTransform: 'capitalize',
-    marginBottom: 2,
-  },
-  listItemStatus: {
+  listMeta: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statusDotSmall: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 4,
-  },
-  statusTextSmall: {
+  listRating: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: COLORS.dark,
+    marginLeft: 3,
+  },
+  listDot: {
+    marginHorizontal: 5,
+    color: COLORS.gray,
+    fontSize: 12,
+  },
+  listDistance: {
+    fontSize: 12,
+    color: COLORS.gray,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.white,
   },
 
-  // Nearby
-  nearbyCard: {
+  // Nearby Sheet - Compact & Draggable
+  nearbySheet: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 110,
     left: 0,
     right: 0,
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  nearbyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    gap: 8,
   },
   nearbyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.dark,
-    marginBottom: 12,
   },
-  nearbyItem: {
+  nearbyCount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.gray,
+  },
+  nearbyScroll: {
+    paddingHorizontal: 16,
+  },
+  nearbyCard: {
     alignItems: 'center',
-    marginRight: 16,
-    width: 80,
+    marginRight: 14,
+    width: 70,
   },
   nearbyLogo: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: COLORS.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
     overflow: 'hidden',
   },
   nearbyLogoImg: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
   },
   nearbyName: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: COLORS.dark,
     textAlign: 'center',
+    marginBottom: 3,
   },
-  nearbyType: {
+  nearbyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  nearbyRating: {
     fontSize: 10,
-    color: COLORS.gray,
-    textTransform: 'capitalize',
+    fontWeight: '600',
+    color: COLORS.dark,
   },
 
   loadingOverlay: {

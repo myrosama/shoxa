@@ -44,20 +44,12 @@ export default function MapSearchScreen() {
     const [shops, setShops] = useState<Shop[]>([]);
     const [searchResults, setSearchResults] = useState<Shop[]>([]);
 
-    // Animations
+    // Animation
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(30)).current;
 
     useEffect(() => {
-        // Focus input
         setTimeout(() => inputRef.current?.focus(), 300);
-
-        // Animate in
-        Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-            Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, friction: 8 }),
-        ]).start();
-
+        Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
         loadShops();
     }, []);
 
@@ -101,32 +93,18 @@ export default function MapSearchScreen() {
 
     const handleBack = () => {
         Keyboard.dismiss();
-        Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-            Animated.timing(slideAnim, { toValue: 30, duration: 150, useNativeDriver: true }),
-        ]).start(() => router.back());
+        router.back();
     };
 
     const handleSelectShop = (shop: Shop) => {
         Keyboard.dismiss();
-        // Navigate to shop page
         router.replace(`/shop/${shop.id}`);
     };
-
-    // Categories for quick browse
-    const categories = [
-        { id: 'restaurant', label: 'Restaurants', icon: 'restaurant' },
-        { id: 'pharmacy', label: 'Pharmacy', icon: 'medkit' },
-        { id: 'grocery', label: 'Grocery', icon: 'cart' },
-        { id: 'cafe', label: 'Cafes', icon: 'cafe' },
-    ];
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
             {/* Header */}
-            <Animated.View
-                style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
-            >
+            <View style={styles.header}>
                 <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
                 </TouchableOpacity>
@@ -147,15 +125,15 @@ export default function MapSearchScreen() {
                         </TouchableOpacity>
                     )}
                 </View>
-            </Animated.View>
+            </View>
 
             <ScrollView
                 style={styles.content}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
             >
-                {/* Search Results */}
                 {searchQuery.length > 0 ? (
+                    // Search Results
                     <Animated.View style={{ opacity: fadeAnim }}>
                         {searchResults.length > 0 ? (
                             searchResults.map((shop) => (
@@ -187,54 +165,25 @@ export default function MapSearchScreen() {
                         )}
                     </Animated.View>
                 ) : (
-                    <>
-                        {/* Categories */}
-                        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-                            <Text style={styles.sectionTitle}>Browse by Category</Text>
-                            <View style={styles.categoryGrid}>
-                                {categories.map((cat) => (
-                                    <TouchableOpacity
-                                        key={cat.id}
-                                        style={styles.categoryCard}
-                                        onPress={() => {
-                                            handleBack();
-                                            // Could filter by category on explore screen
-                                        }}
-                                    >
-                                        <View style={styles.categoryIcon}>
-                                            <Ionicons name={cat.icon as any} size={24} color={COLORS.primary} />
-                                        </View>
-                                        <Text style={styles.categoryLabel}>{cat.label}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </Animated.View>
-
-                        {/* Popular Shops */}
-                        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-                            <Text style={styles.sectionTitle}>Popular Shops</Text>
-                            {shops.slice(0, 5).map((shop) => (
-                                <TouchableOpacity
-                                    key={shop.id}
-                                    style={styles.shopItem}
-                                    onPress={() => handleSelectShop(shop)}
-                                >
-                                    <View style={styles.shopLogo}>
-                                        {shop.logoUrl ? (
-                                            <Image source={{ uri: shop.logoUrl }} style={styles.shopLogoImg} />
-                                        ) : (
-                                            <Ionicons name="storefront" size={22} color={COLORS.primary} />
-                                        )}
-                                    </View>
-                                    <View style={styles.shopInfo}>
-                                        <Text style={styles.shopName}>{shop.name}</Text>
-                                        <Text style={styles.shopType}>{shop.type}</Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={20} color={COLORS.lightGray} />
-                                </TouchableOpacity>
-                            ))}
-                        </Animated.View>
-                    </>
+                    // Recent / Popular Shops - Simple list
+                    <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+                        <Text style={styles.sectionTitle}>Recent</Text>
+                        {shops.slice(0, 8).map((shop) => (
+                            <TouchableOpacity
+                                key={shop.id}
+                                style={styles.shopItem}
+                                onPress={() => handleSelectShop(shop)}
+                            >
+                                <View style={styles.shopIcon}>
+                                    <Ionicons name="time-outline" size={20} color={COLORS.gray} />
+                                </View>
+                                <View style={styles.shopInfo}>
+                                    <Text style={styles.shopName}>{shop.name}</Text>
+                                    <Text style={styles.shopType}>Shop • {shop.type}</Text>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </Animated.View>
                 )}
             </ScrollView>
         </View>
@@ -251,7 +200,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: COLORS.background,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.lightGray,
     },
@@ -285,90 +233,39 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
-    // Sections
+    // Section
     section: {
-        padding: 20,
+        paddingTop: 8,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: COLORS.dark,
-        marginBottom: 16,
-    },
-
-    // Categories
-    categoryGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-    },
-    categoryCard: {
-        width: '47%',
-        backgroundColor: COLORS.white,
-        borderRadius: 16,
-        padding: 16,
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    categoryIcon: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: COLORS.primaryLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    categoryLabel: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '600',
-        color: COLORS.dark,
+        color: COLORS.gray,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
     },
 
-    // Shop Items
+    // Shop Items - Simple list like Google Maps
     shopItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.white,
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
     },
-    shopLogo: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: COLORS.primaryLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 14,
-        overflow: 'hidden',
+    shopIcon: {
+        width: 24,
+        marginRight: 16,
     },
-    shopLogoImg: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-    },
-    shopInfo: {
-        flex: 1,
-    },
+    shopInfo: { flex: 1 },
     shopName: {
         fontSize: 16,
-        fontWeight: '600',
         color: COLORS.dark,
         marginBottom: 2,
     },
     shopType: {
-        fontSize: 13,
+        fontSize: 14,
         color: COLORS.gray,
         textTransform: 'capitalize',
     },
@@ -397,9 +294,7 @@ const styles = StyleSheet.create({
         height: 44,
         borderRadius: 10,
     },
-    resultInfo: {
-        flex: 1,
-    },
+    resultInfo: { flex: 1 },
     resultName: {
         fontSize: 16,
         fontWeight: '600',
