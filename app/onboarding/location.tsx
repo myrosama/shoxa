@@ -314,8 +314,8 @@ const styles = StyleSheet.create({
         bottom: 0,
         justifyContent: 'center',
         alignItems: 'center',
-        // Offset to account for bottom sheet height
-        marginBottom: 100,
+        // Larger offset to avoid bottom sheet overlap
+        marginBottom: 160,
     },
     centerPin: {
         alignItems: 'center',
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     recenterBtn: {
         position: 'absolute',
         right: 20,
-        bottom: 220,
+        bottom: 260,
         width: 50,
         height: 50,
         borderRadius: 25,

@@ -12,7 +12,6 @@ import {
   Dimensions,
   Image,
   Linking,
-  PanResponder,
   Platform,
   ScrollView,
   Share,
@@ -21,6 +20,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -51,20 +51,15 @@ const CATEGORIES = [
 const DEFAULT_REGION = {
   latitude: 41.2995,
   longitude: 69.2401,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
+  latitudeDelta: 0.02,
+  longitudeDelta: 0.02,
 };
 
-const ZOOMED_OUT_DELTA = {
-  latitudeDelta: 0.15,
-  longitudeDelta: 0.15,
-};
-
-// Sheet heights - collapsed shows header + filters
-const CATEGORY_COLLAPSED = 130;
-const CATEGORY_EXPANDED = height * 0.55;
-const NEARBY_COLLAPSED = 60;
-const NEARBY_EXPANDED = 200;
+// Sheet snap points
+const NEARBY_MIN = 70;
+const NEARBY_MAX = 220;
+const CATEGORY_MIN = 130;
+const CATEGORY_MAX = height * 0.55;
 
 interface Shop {
   id: string;
@@ -76,7 +71,7 @@ interface Shop {
   rating?: number;
   isOpen?: boolean;
   openingHours?: string;
-  posts?: string[]; // Array of post image URLs
+  posts?: string[];
 }
 
 export default function ExploreScreen() {
@@ -94,64 +89,11 @@ export default function ExploreScreen() {
   const [is3D, setIs3D] = useState(true);
   const [isCategoryBrowse, setIsCategoryBrowse] = useState(false);
 
-  const nearbyHeight = useRef(new Animated.Value(NEARBY_EXPANDED)).current;
-  const categoryHeight = useRef(new Animated.Value(CATEGORY_COLLAPSED)).current;
+  // Animated values for sheet heights
+  const nearbyTranslateY = useRef(new Animated.Value(0)).current;
+  const categoryTranslateY = useRef(new Animated.Value(0)).current;
   const [nearbyExpanded, setNearbyExpanded] = useState(true);
-  const [categoryExpanded, setCategoryExpanded] = useState(false);
-
-  const nearbyPan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
-      onPanResponderMove: (_, gs) => {
-        const newHeight = nearbyExpanded
-          ? Math.max(NEARBY_COLLAPSED, NEARBY_EXPANDED - gs.dy)
-          : Math.min(NEARBY_EXPANDED, NEARBY_COLLAPSED - gs.dy);
-        nearbyHeight.setValue(newHeight);
-      },
-      onPanResponderRelease: (_, gs) => {
-        const shouldExpand = gs.dy < -30 || (nearbyExpanded && gs.dy > -30 && gs.dy < 30);
-        const shouldCollapse = gs.dy > 30 || (!nearbyExpanded && gs.dy < 30 && gs.dy > -30);
-
-        if (shouldCollapse && nearbyExpanded) {
-          Animated.spring(nearbyHeight, { toValue: NEARBY_COLLAPSED, useNativeDriver: false, tension: 100, friction: 12 }).start();
-          setNearbyExpanded(false);
-        } else if (shouldExpand && !nearbyExpanded) {
-          Animated.spring(nearbyHeight, { toValue: NEARBY_EXPANDED, useNativeDriver: false, tension: 100, friction: 12 }).start();
-          setNearbyExpanded(true);
-        } else {
-          Animated.spring(nearbyHeight, { toValue: nearbyExpanded ? NEARBY_EXPANDED : NEARBY_COLLAPSED, useNativeDriver: false, tension: 100, friction: 12 }).start();
-        }
-      },
-    })
-  ).current;
-
-  const categoryPan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
-      onPanResponderMove: (_, gs) => {
-        const newHeight = categoryExpanded
-          ? Math.max(CATEGORY_COLLAPSED, CATEGORY_EXPANDED - gs.dy)
-          : Math.min(CATEGORY_EXPANDED, CATEGORY_COLLAPSED - gs.dy);
-        categoryHeight.setValue(newHeight);
-      },
-      onPanResponderRelease: (_, gs) => {
-        const shouldExpand = gs.dy < -40;
-        const shouldCollapse = gs.dy > 40;
-
-        if (shouldCollapse && categoryExpanded) {
-          Animated.spring(categoryHeight, { toValue: CATEGORY_COLLAPSED, useNativeDriver: false, tension: 100, friction: 12 }).start();
-          setCategoryExpanded(false);
-        } else if (shouldExpand && !categoryExpanded) {
-          Animated.spring(categoryHeight, { toValue: CATEGORY_EXPANDED, useNativeDriver: false, tension: 100, friction: 12 }).start();
-          setCategoryExpanded(true);
-        } else {
-          Animated.spring(categoryHeight, { toValue: categoryExpanded ? CATEGORY_EXPANDED : CATEGORY_COLLAPSED, useNativeDriver: false, tension: 100, friction: 12 }).start();
-        }
-      },
-    })
-  ).current;
+  const [categoryExpanded, setCategoryExpanded] = useState(true);
 
   useEffect(() => {
     getCurrentLocation();
@@ -175,7 +117,7 @@ export default function ExploreScreen() {
           rating: data.rating || 4.5,
           isOpen: data.isOpen !== false,
           openingHours: data.openingHours,
-          posts: data.posts || [], // Will be empty until we implement posts
+          posts: data.posts || [],
         });
       }
       setShops(shopData);
@@ -190,32 +132,118 @@ export default function ExploreScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
 
-      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const coords = { latitude: location.coords.latitude, longitude: location.coords.longitude };
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High
+      });
+
+      const coords = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      };
       setUserLocation(coords);
 
       const newRegion = { ...coords, latitudeDelta: 0.02, longitudeDelta: 0.02 };
       setRegion(newRegion);
-      mapRef.current?.animateToRegion(newRegion, 1000);
+      mapRef.current?.animateToRegion(newRegion, 800);
     } catch (error) {
       console.error('Error getting location:', error);
     }
   };
 
   const handleRecenter = () => getCurrentLocation();
+
   const toggle3D = () => {
     setIs3D(!is3D);
-    mapRef.current?.animateCamera({ pitch: is3D ? 0 : 45 }, { duration: 500 });
+    mapRef.current?.animateCamera({ pitch: is3D ? 0 : 45 }, { duration: 400 });
+  };
+
+  // Simplified gesture handlers using onGestureEvent
+  const onNearbyGesture = Animated.event(
+    [{ nativeEvent: { translationY: nearbyTranslateY } }],
+    { useNativeDriver: true }
+  );
+
+  const onNearbyHandlerStateChange = (event: any) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      const { translationY } = event.nativeEvent;
+      const threshold = 50;
+
+      if (translationY > threshold && nearbyExpanded) {
+        // Collapse
+        Animated.spring(nearbyTranslateY, {
+          toValue: NEARBY_MAX - NEARBY_MIN,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }).start();
+        setNearbyExpanded(false);
+      } else if (translationY < -threshold && !nearbyExpanded) {
+        // Expand
+        Animated.spring(nearbyTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }).start();
+        setNearbyExpanded(true);
+      } else {
+        // Snap back
+        Animated.spring(nearbyTranslateY, {
+          toValue: nearbyExpanded ? 0 : NEARBY_MAX - NEARBY_MIN,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }).start();
+      }
+    }
+  };
+
+  const onCategoryGesture = Animated.event(
+    [{ nativeEvent: { translationY: categoryTranslateY } }],
+    { useNativeDriver: true }
+  );
+
+  const onCategoryHandlerStateChange = (event: any) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      const { translationY } = event.nativeEvent;
+      const threshold = 60;
+
+      if (translationY > threshold && categoryExpanded) {
+        Animated.spring(categoryTranslateY, {
+          toValue: CATEGORY_MAX - CATEGORY_MIN,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }).start();
+        setCategoryExpanded(false);
+      } else if (translationY < -threshold && !categoryExpanded) {
+        Animated.spring(categoryTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }).start();
+        setCategoryExpanded(true);
+      } else {
+        Animated.spring(categoryTranslateY, {
+          toValue: categoryExpanded ? 0 : CATEGORY_MAX - CATEGORY_MIN,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }).start();
+      }
+    }
   };
 
   const handleMapInteraction = () => {
     if (categoryExpanded) {
-      Animated.spring(categoryHeight, { toValue: CATEGORY_COLLAPSED, useNativeDriver: false, tension: 100, friction: 12 }).start();
+      Animated.spring(categoryTranslateY, {
+        toValue: CATEGORY_MAX - CATEGORY_MIN,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 10,
+      }).start();
       setCategoryExpanded(false);
-    }
-    if (nearbyExpanded) {
-      Animated.spring(nearbyHeight, { toValue: NEARBY_COLLAPSED, useNativeDriver: false, tension: 100, friction: 12 }).start();
-      setNearbyExpanded(false);
     }
   };
 
@@ -224,17 +252,46 @@ export default function ExploreScreen() {
     setSelectedShop(null);
 
     if (categoryId === 'all') {
+      // Return to default view with nearby expanded
       setIsCategoryBrowse(false);
+      setNearbyExpanded(true);
+      Animated.spring(nearbyTranslateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 10,
+      }).start();
+
+      // Focus on user location
       if (userLocation) {
-        mapRef.current?.animateToRegion({ ...userLocation, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
+        mapRef.current?.animateToRegion({
+          ...userLocation,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02
+        }, 500);
       }
     } else {
+      // Show category browse with expanded sheet
       setIsCategoryBrowse(true);
       setCategoryExpanded(true);
-      Animated.spring(categoryHeight, { toValue: CATEGORY_EXPANDED, useNativeDriver: false, tension: 100, friction: 12 }).start();
+      Animated.spring(categoryTranslateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 10,
+      }).start();
 
+      // Keep map centered on user location - stay zoomed in
       if (userLocation) {
-        mapRef.current?.animateToRegion({ ...userLocation, ...ZOOMED_OUT_DELTA }, 500);
+        // Offset the center SOUTH so user location appears in upper visible area
+        // The bottom sheet covers ~50% of screen, so we shift the center down
+        const latOffset = 0.025; // Move center south so user dot is higher on screen
+        mapRef.current?.animateToRegion({
+          latitude: userLocation.latitude - latOffset,
+          longitude: userLocation.longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05
+        }, 500);
       }
     }
   };
@@ -243,7 +300,12 @@ export default function ExploreScreen() {
     setSelectedShop(shop);
     setIsCategoryBrowse(false);
     if (shop.latitude && shop.longitude) {
-      mapRef.current?.animateToRegion({ latitude: shop.latitude, longitude: shop.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 500);
+      mapRef.current?.animateToRegion({
+        latitude: shop.latitude,
+        longitude: shop.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01
+      }, 500);
     }
   };
 
@@ -252,10 +314,20 @@ export default function ExploreScreen() {
   const handleCloseCategoryBrowse = () => {
     setIsCategoryBrowse(false);
     setSelectedCategory('all');
-    Animated.spring(categoryHeight, { toValue: CATEGORY_COLLAPSED, useNativeDriver: false, tension: 100, friction: 12 }).start();
-    setCategoryExpanded(false);
+    setNearbyExpanded(true);
+    Animated.spring(nearbyTranslateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 10,
+    }).start();
+
     if (userLocation) {
-      mapRef.current?.animateToRegion({ ...userLocation, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
+      mapRef.current?.animateToRegion({
+        ...userLocation,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02
+      }, 500);
     }
   };
 
@@ -284,8 +356,29 @@ export default function ExploreScreen() {
 
   const getCategoryLabel = () => CATEGORIES.find(c => c.id === selectedCategory)?.label || 'Shops';
 
+  // Calculate animated heights
+  const nearbyAnimatedStyle = {
+    transform: [{
+      translateY: nearbyTranslateY.interpolate({
+        inputRange: [0, NEARBY_MAX - NEARBY_MIN],
+        outputRange: [0, NEARBY_MAX - NEARBY_MIN],
+        extrapolate: 'clamp',
+      })
+    }]
+  };
+
+  const categoryAnimatedStyle = {
+    transform: [{
+      translateY: categoryTranslateY.interpolate({
+        inputRange: [0, CATEGORY_MAX - CATEGORY_MIN],
+        outputRange: [0, CATEGORY_MAX - CATEGORY_MIN],
+        extrapolate: 'clamp',
+      })
+    }]
+  };
+
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -414,15 +507,18 @@ export default function ExploreScreen() {
         </View>
       )}
 
-      {/* Category Browse Sheet - Google Maps Style */}
+      {/* Category Browse Sheet */}
       {isCategoryBrowse && (
-        <Animated.View style={[styles.categorySheet, { height: categoryHeight, paddingBottom: insets.bottom + 20 }]}>
-          {/* Drag Handle */}
-          <View {...categoryPan.panHandlers} style={styles.dragHandle}>
-            <View style={styles.dragBar} />
-          </View>
+        <Animated.View style={[styles.categorySheet, categoryAnimatedStyle, { paddingBottom: insets.bottom + 20 }]}>
+          <PanGestureHandler
+            onGestureEvent={onCategoryGesture}
+            onHandlerStateChange={onCategoryHandlerStateChange}
+          >
+            <Animated.View style={styles.dragHandle}>
+              <View style={styles.dragBar} />
+            </Animated.View>
+          </PanGestureHandler>
 
-          {/* Header with title and X */}
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{getCategoryLabel()}</Text>
             <TouchableOpacity style={styles.sheetCloseBtn} onPress={handleCloseCategoryBrowse}>
@@ -430,7 +526,6 @@ export default function ExploreScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Filter Chips - Compact inline like Google Maps */}
           <View style={styles.filterRow}>
             <TouchableOpacity style={styles.filterIconBtn}>
               <Ionicons name="options-outline" size={18} color={COLORS.dark} />
@@ -445,17 +540,12 @@ export default function ExploreScreen() {
             <TouchableOpacity style={styles.filterChip}>
               <Text style={styles.filterChipText}>Top rated</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.filterChip}>
-              <Text style={styles.filterChipText}>Wheelchair</Text>
-            </TouchableOpacity>
           </View>
 
-          {/* Shop List - Only show if expanded */}
           {categoryExpanded && (
             <ScrollView style={styles.shopList} showsVerticalScrollIndicator={false}>
               {filteredShops.map((shop) => (
                 <View key={shop.id} style={styles.shopListItem}>
-                  {/* Shop Info */}
                   <TouchableOpacity onPress={() => handleSelectShop(shop)}>
                     <Text style={styles.shopListName}>{shop.name}</Text>
                     <View style={styles.shopListMeta}>
@@ -469,7 +559,6 @@ export default function ExploreScreen() {
                     </Text>
                   </TouchableOpacity>
 
-                  {/* Only show photos if shop has posts */}
                   {shop.posts && shop.posts.length > 0 && (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.postGallery}>
                       {shop.posts.map((postUrl, i) => (
@@ -478,7 +567,6 @@ export default function ExploreScreen() {
                     </ScrollView>
                   )}
 
-                  {/* Action Buttons - Google Maps style rounded pills */}
                   <View style={styles.actionRow}>
                     <TouchableOpacity style={styles.actionPill} onPress={() => handleDirections(shop)}>
                       <Ionicons name="navigate" size={16} color={COLORS.blue} />
@@ -502,37 +590,42 @@ export default function ExploreScreen() {
         </Animated.View>
       )}
 
-      {/* Nearby */}
+      {/* Nearby Sheet */}
       {!selectedShop && !isCategoryBrowse && filteredShops.length > 0 && (
-        <Animated.View style={[styles.nearbySheet, { height: nearbyHeight, paddingBottom: insets.bottom + 20 }]}>
-          <View {...nearbyPan.panHandlers} style={styles.dragHandle}>
-            <View style={styles.dragBar} />
-          </View>
+        <Animated.View style={[styles.nearbySheet, nearbyAnimatedStyle, { paddingBottom: insets.bottom + 20 }]}>
+          <PanGestureHandler
+            onGestureEvent={onNearbyGesture}
+            onHandlerStateChange={onNearbyHandlerStateChange}
+          >
+            <Animated.View style={styles.dragHandle}>
+              <View style={styles.dragBar} />
+            </Animated.View>
+          </PanGestureHandler>
+
           <View style={styles.nearbyHeader}>
             <Ionicons name="location" size={18} color={COLORS.primary} />
             <Text style={styles.nearbyTitle}>Nearby</Text>
             <Text style={styles.nearbyCount}>{filteredShops.length}</Text>
           </View>
-          {nearbyExpanded && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.nearbyScroll}>
-              {filteredShops.slice(0, 8).map((shop) => (
-                <TouchableOpacity key={shop.id} style={styles.nearbyCard} onPress={() => handleSelectShop(shop)}>
-                  <View style={styles.nearbyLogo}>
-                    {shop.logoUrl ? (
-                      <Image source={{ uri: shop.logoUrl }} style={styles.nearbyLogoImg} />
-                    ) : (
-                      <Ionicons name="storefront" size={18} color={COLORS.primary} />
-                    )}
-                  </View>
-                  <Text style={styles.nearbyName} numberOfLines={1}>{shop.name}</Text>
-                  <View style={styles.nearbyBadge}>
-                    <Ionicons name="star" size={10} color="#FFB800" />
-                    <Text style={styles.nearbyRating}>{shop.rating}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.nearbyScroll}>
+            {filteredShops.slice(0, 8).map((shop) => (
+              <TouchableOpacity key={shop.id} style={styles.nearbyCard} onPress={() => handleSelectShop(shop)}>
+                <View style={styles.nearbyLogo}>
+                  {shop.logoUrl ? (
+                    <Image source={{ uri: shop.logoUrl }} style={styles.nearbyLogoImg} />
+                  ) : (
+                    <Ionicons name="storefront" size={18} color={COLORS.primary} />
+                  )}
+                </View>
+                <Text style={styles.nearbyName} numberOfLines={1}>{shop.name}</Text>
+                <View style={styles.nearbyBadge}>
+                  <Ionicons name="star" size={10} color="#FFB800" />
+                  <Text style={styles.nearbyRating}>{shop.rating}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </Animated.View>
       )}
 
@@ -541,7 +634,7 @@ export default function ExploreScreen() {
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       )}
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -610,25 +703,22 @@ const styles = StyleSheet.create({
   viewShopBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 14, gap: 8 },
   viewShopText: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
 
-  // Category Sheet
   categorySheet: {
-    position: 'absolute', bottom: 110, left: 0, right: 0,
+    position: 'absolute', bottom: 110, left: 0, right: 0, height: CATEGORY_MAX,
     backgroundColor: COLORS.background, borderTopLeftRadius: 16, borderTopRightRadius: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 10,
   },
-  dragHandle: { alignItems: 'center', paddingVertical: 8 },
+  dragHandle: { alignItems: 'center', paddingVertical: 10 },
   dragBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.lightGray },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 },
   sheetTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.dark },
   sheetCloseBtn: { padding: 4 },
 
-  // Filter Row - compact inline
-  filterRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 8, gap: 6 },
+  filterRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 10, gap: 6 },
   filterIconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.white, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.lightGray },
   filterChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.lightGray, gap: 4 },
   filterChipText: { fontSize: 13, color: COLORS.dark },
 
-  // Shop List
   shopList: { flex: 1, paddingHorizontal: 16 },
   shopListItem: { paddingVertical: 12 },
   shopListName: { fontSize: 16, fontWeight: '600', color: COLORS.dark, marginBottom: 2 },
@@ -638,19 +728,16 @@ const styles = StyleSheet.create({
   shopListType: { fontSize: 14, color: COLORS.gray, textTransform: 'capitalize' },
   shopListStatus: { fontSize: 13, fontWeight: '500' },
 
-  // Post Gallery - only shown if posts exist
   postGallery: { marginTop: 12, marginBottom: 8 },
   postImage: { width: 120, height: 80, borderRadius: 8, marginRight: 8 },
 
-  // Action Buttons - Google Maps pill style
   actionRow: { flexDirection: 'row', marginTop: 8, gap: 8 },
   actionPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.lightGray, gap: 6 },
   actionPillText: { fontSize: 13, color: COLORS.blue, fontWeight: '500' },
   listDivider: { height: 1, backgroundColor: COLORS.lightGray, marginTop: 12 },
 
-  // Nearby
   nearbySheet: {
-    position: 'absolute', bottom: 110, left: 0, right: 0,
+    position: 'absolute', bottom: 110, left: 0, right: 0, height: NEARBY_MAX,
     backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 8,
   },

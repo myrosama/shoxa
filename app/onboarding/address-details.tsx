@@ -1,7 +1,7 @@
 import { useAddresses } from '@/contexts/AddressContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Keyboard,
@@ -36,12 +36,16 @@ const LOCATION_TYPES = [
 export default function AddressDetailsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { addAddress } = useAddresses();
+    const { addresses, addAddress, updateAddress, deleteAddress } = useAddresses();
     const params = useLocalSearchParams<{
         latitude: string;
         longitude: string;
         address: string;
+        editId: string;
     }>();
+
+    const isEditMode = !!params.editId;
+    const existingAddress = isEditMode ? addresses.find(a => a.id === params.editId) : null;
 
     const [locationType, setLocationType] = useState<'home' | 'work' | 'other'>('home');
     const [addressName, setAddressName] = useState('Uy');
@@ -50,6 +54,18 @@ export default function AddressDetailsScreen() {
     const [apartment, setApartment] = useState('');
     const [courierNote, setCourierNote] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+
+    // Load existing address data if in edit mode
+    useEffect(() => {
+        if (isEditMode && existingAddress) {
+            setLocationType(existingAddress.type as 'home' | 'work' | 'other');
+            setAddressName(existingAddress.name);
+            setEntrance(existingAddress.entrance || '');
+            setFloor(existingAddress.floor || '');
+            setApartment(existingAddress.apartment || '');
+            setCourierNote(existingAddress.courierNote || '');
+        }
+    }, [isEditMode, existingAddress]);
 
     const handleSaveAddress = async () => {
         if (!addressName.trim()) {
@@ -60,34 +76,61 @@ export default function AddressDetailsScreen() {
         setIsSaving(true);
 
         try {
-            await addAddress({
-                type: locationType,
-                name: addressName,
-                address: params.address || '',
-                latitude: parseFloat(params.latitude || '0'),
-                longitude: parseFloat(params.longitude || '0'),
-                entrance,
-                floor,
-                apartment,
-                courierNote,
-            });
-
-            Alert.alert(
-                'Address Saved!',
-                'Your delivery address has been saved successfully.',
-                [
-                    {
-                        text: 'OK',
-                        onPress: () => router.replace('/(tabs)'),
-                    },
-                ]
-            );
+            if (isEditMode && params.editId) {
+                await updateAddress(params.editId, {
+                    type: locationType,
+                    name: addressName,
+                    address: existingAddress?.address || params.address || '',
+                    entrance,
+                    floor,
+                    apartment,
+                    courierNote,
+                });
+                Alert.alert('Address Updated!', 'Your address has been updated.', [
+                    { text: 'OK', onPress: () => router.back() },
+                ]);
+            } else {
+                await addAddress({
+                    type: locationType,
+                    name: addressName,
+                    address: params.address || '',
+                    latitude: parseFloat(params.latitude || '0'),
+                    longitude: parseFloat(params.longitude || '0'),
+                    entrance,
+                    floor,
+                    apartment,
+                    courierNote,
+                });
+                Alert.alert('Address Saved!', 'Your delivery address has been saved successfully.', [
+                    { text: 'OK', onPress: () => router.replace('/(tabs)') },
+                ]);
+            }
         } catch (error) {
             console.error('Error saving address:', error);
             Alert.alert('Error', 'Failed to save address. Please try again.');
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleDeleteAddress = () => {
+        if (!params.editId) return;
+
+        Alert.alert(
+            'Delete Address',
+            'Are you sure you want to delete this address?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await deleteAddress(params.editId);
+                        router.back();
+                    },
+                },
+            ]
+        );
     };
 
     return (
@@ -102,8 +145,14 @@ export default function AddressDetailsScreen() {
                         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
                             <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Address Details</Text>
-                        <View style={{ width: 40 }} />
+                        <Text style={styles.headerTitle}>{isEditMode ? 'Edit Address' : 'Address Details'}</Text>
+                        {isEditMode ? (
+                            <TouchableOpacity style={styles.backBtn} onPress={handleDeleteAddress}>
+                                <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={{ width: 40 }} />
+                        )}
                     </View>
 
                     <ScrollView
@@ -117,7 +166,7 @@ export default function AddressDetailsScreen() {
                             <View style={styles.addressDisplay}>
                                 <Ionicons name="location" size={22} color={COLORS.primary} />
                                 <Text style={styles.addressText} numberOfLines={2}>
-                                    {params.address || 'Address not available'}
+                                    {isEditMode ? (existingAddress?.address || 'Address not available') : (params.address || 'Address not available')}
                                 </Text>
                             </View>
                         </View>
@@ -220,7 +269,7 @@ export default function AddressDetailsScreen() {
                             disabled={isSaving}
                         >
                             <Text style={styles.saveBtnText}>
-                                {isSaving ? 'Saving...' : 'Save Address'}
+                                {isSaving ? 'Saving...' : (isEditMode ? 'Update Address' : 'Save Address')}
                             </Text>
                         </TouchableOpacity>
                     </View>

@@ -117,6 +117,7 @@ export default function HomeScreen() {
 
           return {
             id: doc.id,
+            name: data.name || 'Unknown Shop',
             ...data,
             logoUrl: logoUrl
           };
@@ -605,7 +606,7 @@ export default function HomeScreen() {
                         style={styles.editAddressBtn}
                         onPress={() => {
                           closeAddressModal();
-                          // TODO: Navigate to edit address
+                          router.push(`/onboarding/address-details?editId=${addr.id}`);
                         }}
                       >
                         <Ionicons name="create-outline" size={20} color={COLORS.gray} />
