@@ -74,6 +74,68 @@ interface Shop {
   posts?: string[];
 }
 
+// Animated Category Pill Component
+const AnimatedCategoryPill = ({
+  cat,
+  isSelected,
+  onSelect
+}: {
+  cat: { id: string; label: string; icon: string };
+  isSelected: boolean;
+  onSelect: () => void;
+}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const bounceAnim = useRef(new Animated.Value(isSelected ? 1.05 : 1)).current;
+
+  useEffect(() => {
+    Animated.spring(bounceAnim, {
+      toValue: isSelected ? 1.05 : 1,
+      useNativeDriver: true,
+      tension: 200,
+      friction: 8,
+    }).start();
+  }, [isSelected]);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 200,
+      friction: 8,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale: Animated.multiply(scaleAnim, bounceAnim) }] }}>
+      <TouchableOpacity
+        style={[styles.categoryPill, isSelected && styles.categoryPillActive]}
+        onPress={onSelect}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+      >
+        <Ionicons
+          name={cat.icon as any}
+          size={16}
+          color={isSelected ? COLORS.white : COLORS.primary}
+        />
+        <Text style={[styles.categoryText, isSelected && styles.categoryTextActive]}>
+          {cat.label}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 export default function ExploreScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -92,6 +154,8 @@ export default function ExploreScreen() {
   // Animated values for sheet heights
   const nearbyTranslateY = useRef(new Animated.Value(0)).current;
   const categoryTranslateY = useRef(new Animated.Value(0)).current;
+  const contentFadeAnim = useRef(new Animated.Value(1)).current;
+  const sheetPopAnim = useRef(new Animated.Value(0.95)).current;
   const [nearbyExpanded, setNearbyExpanded] = useState(true);
   const [categoryExpanded, setCategoryExpanded] = useState(true);
 
@@ -274,12 +338,23 @@ export default function ExploreScreen() {
       // Show category browse with expanded sheet
       setIsCategoryBrowse(true);
       setCategoryExpanded(true);
-      Animated.spring(categoryTranslateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 10,
-      }).start();
+
+      // Reset and animate sheet pop-up
+      sheetPopAnim.setValue(0.95);
+      Animated.parallel([
+        Animated.spring(categoryTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }),
+        Animated.spring(sheetPopAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 8,
+        }),
+      ]).start();
 
       // Keep map centered on user location - stay zoomed in
       if (userLocation) {
@@ -439,14 +514,12 @@ export default function ExploreScreen() {
       <View style={[styles.categoryWrap, { top: insets.top + 60 }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
           {CATEGORIES.map((cat) => (
-            <TouchableOpacity
+            <AnimatedCategoryPill
               key={cat.id}
-              style={[styles.categoryPill, selectedCategory === cat.id && styles.categoryPillActive]}
-              onPress={() => handleCategorySelect(cat.id)}
-            >
-              <Ionicons name={cat.icon as any} size={16} color={selectedCategory === cat.id ? COLORS.white : COLORS.primary} />
-              <Text style={[styles.categoryText, selectedCategory === cat.id && styles.categoryTextActive]}>{cat.label}</Text>
-            </TouchableOpacity>
+              cat={cat}
+              isSelected={selectedCategory === cat.id}
+              onSelect={() => handleCategorySelect(cat.id)}
+            />
           ))}
         </ScrollView>
       </View>
@@ -509,7 +582,17 @@ export default function ExploreScreen() {
 
       {/* Category Browse Sheet */}
       {isCategoryBrowse && (
-        <Animated.View style={[styles.categorySheet, categoryAnimatedStyle, { paddingBottom: insets.bottom + 20 }]}>
+        <Animated.View style={[
+          styles.categorySheet,
+          categoryAnimatedStyle,
+          {
+            paddingBottom: insets.bottom + 20,
+            transform: [
+              ...categoryAnimatedStyle.transform,
+              { scale: sheetPopAnim }
+            ]
+          }
+        ]}>
           <PanGestureHandler
             onGestureEvent={onCategoryGesture}
             onHandlerStateChange={onCategoryHandlerStateChange}

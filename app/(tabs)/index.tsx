@@ -48,6 +48,62 @@ const CATEGORIES = [
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 40) / 2 - 8;
 
+// Animated Category Pill for Home Screen
+const AnimatedHomeCategoryPill = ({
+  cat,
+  isActive,
+  onPress
+}: {
+  cat: { id: string; label: string; icon: string };
+  isActive: boolean;
+  onPress: () => void;
+}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const bounceAnim = useRef(new Animated.Value(isActive ? 1.05 : 1)).current;
+
+  useEffect(() => {
+    Animated.spring(bounceAnim, {
+      toValue: isActive ? 1.05 : 1,
+      useNativeDriver: true,
+      tension: 200,
+      friction: 8,
+    }).start();
+  }, [isActive]);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 200,
+      friction: 8,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale: Animated.multiply(scaleAnim, bounceAnim) }] }}>
+      <TouchableOpacity
+        style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+      >
+        <Ionicons name={cat.icon as any} size={18} color={isActive ? COLORS.white : '#5D4037'} style={{ marginRight: 6 }} />
+        <Text style={[styles.categoryText, isActive ? { color: COLORS.white } : { color: '#5D4037' }]}>{cat.label}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -410,19 +466,14 @@ export default function HomeScreen() {
         {/* Category Pills (in-flow, stays visible - no fade) */}
         <View style={styles.categoriesSection}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
-            {CATEGORIES.map((cat) => {
-              const isActive = activeCategory === cat.id;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.categoryPill, isActive ? styles.categoryPillActive : styles.categoryPillInactive]}
-                  onPress={() => setActiveCategory(cat.id)}
-                >
-                  <Ionicons name={cat.icon as any} size={18} color={isActive ? COLORS.white : '#5D4037'} style={{ marginRight: 6 }} />
-                  <Text style={[styles.categoryText, isActive ? { color: COLORS.white } : { color: '#5D4037' }]}>{cat.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
+            {CATEGORIES.map((cat) => (
+              <AnimatedHomeCategoryPill
+                key={cat.id}
+                cat={cat}
+                isActive={activeCategory === cat.id}
+                onPress={() => setActiveCategory(cat.id)}
+              />
+            ))}
           </ScrollView>
         </View>
 
