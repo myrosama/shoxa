@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SHOXA Admin - Business Portal</title>
+  <title>SHOXA Business</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,13 +15,12 @@
   <div id="app">
     <!-- Auth Pages -->
     <div id="auth-container" class="auth-container">
-      <!-- Login Form -->
       <div id="login-page" class="auth-page">
         <div class="auth-card">
           <div class="auth-logo">
             <img src="logo.png" alt="SHOXA" class="logo-icon">
-            <h1>SHOXA</h1>
-            <p>Business Portal</p>
+            <h1>SHOXA Business</h1>
+            <p>Manage your presence on the map</p>
           </div>
           <form id="login-form" class="auth-form">
             <div class="form-group">
@@ -38,18 +37,17 @@
             </button>
           </form>
           <p class="auth-switch">
-            Don't have an account? <a href="#" id="show-register">Sign Up</a>
+            Don't have an account? <a href="#" id="show-register">Register your business</a>
           </p>
         </div>
       </div>
 
-      <!-- Register Form -->
       <div id="register-page" class="auth-page hidden">
         <div class="auth-card">
           <div class="auth-logo">
             <img src="logo.png" alt="SHOXA" class="logo-icon">
             <h1>Join SHOXA</h1>
-            <p>Register your business</p>
+            <p>Get your business on the map</p>
           </div>
           <form id="register-form" class="auth-form">
             <div class="form-group">
@@ -76,252 +74,73 @@
       </div>
     </div>
 
-    <!-- Onboarding Flow (shown after registration or if no business set up) -->
-    <div id="onboarding-container" class="onboarding-container hidden">
-
-      <!-- Step 1: Business Type Selection -->
-      <div id="onboard-step-1" class="onboard-step active">
-        <div class="onboard-card">
-          <div class="onboard-header">
-            <h1>Welcome to SHOXA! 🎉</h1>
-            <p>Let's set up your business. What type of business do you have?</p>
-          </div>
-
-          <div class="business-type-grid">
-            <div class="business-type-card" data-type="shop" onclick="selectBusinessType('shop')">
-              <div class="type-icon shop">
-                <i class="ri-store-2-line"></i>
-              </div>
-              <h3>Shop / Store</h3>
-              <p>I sell products to customers</p>
-              <ul class="type-examples">
-                <li>Pharmacy</li>
-                <li>Grocery Store</li>
-                <li>Restaurant / Cafe</li>
-                <li>Bakery</li>
-                <li>Retail Store</li>
-              </ul>
-            </div>
-
-            <div class="business-type-card" data-type="amenity" onclick="selectBusinessType('amenity')">
-              <div class="type-icon amenity">
-                <i class="ri-building-4-line"></i>
-              </div>
-              <h3>Amenity / Service</h3>
-              <p>I provide services or information</p>
-              <ul class="type-examples">
-                <li>Hospital / Clinic</li>
-                <li>Bank</li>
-                <li>School</li>
-                <li>Park / Recreation</li>
-                <li>Government Office</li>
-              </ul>
-            </div>
-          </div>
+    <!-- Setup Flow (after first registration) -->
+    <div id="setup-container" class="setup-container hidden">
+      <div class="setup-card">
+        <div class="setup-header">
+          <h1>Welcome to SHOXA! 🎉</h1>
+          <p>Let's set up your business page</p>
         </div>
-      </div>
 
-      <!-- Step 2: Shop Sub-type (only for shops) -->
-      <div id="onboard-step-2" class="onboard-step">
-        <div class="onboard-card">
-          <button class="onboard-back" onclick="goToOnboardStep(1)">
-            <i class="ri-arrow-left-line"></i> Back
-          </button>
-          <div class="onboard-header">
-            <h1>How do you manage inventory?</h1>
-            <p>Choose how you want to manage your products on SHOXA</p>
-          </div>
-
-          <div class="shop-mode-grid">
-            <div class="shop-mode-card" data-mode="pos" onclick="selectShopMode('pos')">
-              <div class="mode-icon pos">
-                <i class="ri-qr-scan-2-line"></i>
-              </div>
-              <h3>I have a POS System</h3>
-              <p>Connect your existing checkout system for automatic sync</p>
-              <div class="mode-features">
-                <span class="feature-tag"><i class="ri-refresh-line"></i> Auto-sync products</span>
-                <span class="feature-tag"><i class="ri-database-line"></i> Real-time inventory</span>
-                <span class="feature-tag"><i class="ri-line-chart-line"></i> Advanced analytics</span>
-              </div>
-              <div class="pos-logos">
-                <span class="pos-logo">Square</span>
-                <span class="pos-logo">Clover</span>
-                <span class="pos-logo">Toast</span>
-                <span class="pos-logo">iiko</span>
-              </div>
-            </div>
-
-            <div class="shop-mode-card" data-mode="manual" onclick="selectShopMode('manual')">
-              <div class="mode-icon manual">
-                <i class="ri-edit-box-line"></i>
-              </div>
-              <h3>I'll Manage Manually</h3>
-              <p>Add and update products yourself through our dashboard</p>
-              <div class="mode-features">
-                <span class="feature-tag"><i class="ri-add-line"></i> Easy product entry</span>
-                <span class="feature-tag"><i class="ri-upload-cloud-line"></i> CSV bulk import</span>
-                <span class="feature-tag"><i class="ri-smartphone-line"></i> Simple interface</span>
-              </div>
-              <p class="mode-note">Perfect for small businesses without digital checkout</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 3A: POS Selection (for POS mode) -->
-      <div id="onboard-step-3-pos" class="onboard-step">
-        <div class="onboard-card">
-          <button class="onboard-back" onclick="goToOnboardStep(2)">
-            <i class="ri-arrow-left-line"></i> Back
-          </button>
-          <div class="onboard-header">
-            <h1>Connect Your POS</h1>
-            <p>Select your point-of-sale system and enter your API credentials</p>
-          </div>
-
-          <div class="pos-selector-grid">
-            <div class="pos-select-card" data-pos="square" onclick="selectPOS('square')">
-              <i class="ri-square-fill" style="color: #006AFF; font-size: 32px;"></i>
-              <span>Square</span>
-            </div>
-            <div class="pos-select-card" data-pos="clover" onclick="selectPOS('clover')">
-              <i class="ri-leaf-fill" style="color: #4CAF50; font-size: 32px;"></i>
-              <span>Clover</span>
-            </div>
-            <div class="pos-select-card" data-pos="toast" onclick="selectPOS('toast')">
-              <i class="ri-restaurant-line" style="color: #FF5722; font-size: 32px;"></i>
-              <span>Toast</span>
-            </div>
-            <div class="pos-select-card" data-pos="iiko" onclick="selectPOS('iiko')">
-              <i class="ri-pie-chart-line" style="color: #9C27B0; font-size: 32px;"></i>
-              <span>iiko</span>
-            </div>
-            <div class="pos-select-card" data-pos="rkeeper" onclick="selectPOS('rkeeper')">
-              <i class="ri-database-2-line" style="color: #2196F3; font-size: 32px;"></i>
-              <span>R-Keeper</span>
-            </div>
-            <div class="pos-select-card" data-pos="other" onclick="selectPOS('other')">
-              <i class="ri-apps-2-line" style="color: #607D8B; font-size: 32px;"></i>
-              <span>Other</span>
-            </div>
-          </div>
-
-          <div id="pos-api-form" class="pos-api-form hidden">
-            <div class="form-group">
-              <label>API Key / Access Token</label>
-              <input type="text" id="pos-api-key" placeholder="Paste your API key here">
-              <p class="form-hint">You can find this in your <span id="pos-name">POS</span> dashboard settings</p>
-            </div>
-            <div class="form-group">
-              <label>Location ID (Optional)</label>
-              <input type="text" id="pos-location-id" placeholder="If you have multiple locations">
-            </div>
-            <button class="btn btn-primary btn-full" onclick="connectPOS()">
-              <i class="ri-link"></i>
-              Connect & Sync Products
-            </button>
-            <button class="btn btn-ghost btn-full" onclick="skipPOS()">
-              Skip for now, I'll connect later
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 3B: Amenity Details (for amenities) -->
-      <div id="onboard-step-3-amenity" class="onboard-step">
-        <div class="onboard-card">
-          <button class="onboard-back" onclick="goToOnboardStep(1)">
-            <i class="ri-arrow-left-line"></i> Back
-          </button>
-          <div class="onboard-header">
-            <h1>Tell us about your place</h1>
-            <p>This information will appear on your public page</p>
-          </div>
-
-          <form id="amenity-form" class="amenity-form">
-            <div class="form-group">
-              <label>Amenity Type</label>
-              <select id="amenity-type" required>
-                <option value="">Select type...</option>
-                <option value="hospital">🏥 Hospital / Clinic</option>
-                <option value="bank">🏦 Bank / Financial</option>
-                <option value="school">🏫 School / Education</option>
-                <option value="park">🌳 Park / Recreation</option>
-                <option value="government">🏛️ Government Office</option>
-                <option value="religious">🕌 Religious Place</option>
-                <option value="gym">💪 Gym / Sports</option>
-                <option value="salon">💇 Salon / Beauty</option>
-                <option value="repair">🔧 Repair Service</option>
-                <option value="other">📍 Other</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Name</label>
-              <input type="text" id="amenity-name" placeholder="Your business name" required>
-            </div>
-            <div class="form-group">
-              <label>Phone Number</label>
-              <input type="tel" id="amenity-phone" placeholder="+998 90 123 4567">
-            </div>
-            <div class="form-group">
-              <label>Brief Description</label>
-              <textarea id="amenity-desc" rows="3" placeholder="What services do you provide?"></textarea>
-            </div>
-            <button type="button" class="btn btn-primary btn-full" onclick="saveAmenityAndContinue()">
-              <span>Continue to Dashboard</span>
-              <i class="ri-arrow-right-line"></i>
-            </button>
-          </form>
-        </div>
-      </div>
-
-      <!-- Step 4: Shop Basic Info (for all shops) -->
-      <div id="onboard-step-4" class="onboard-step">
-        <div class="onboard-card">
-          <button class="onboard-back" onclick="goToOnboardStep(selectedShopMode === 'pos' ? '3-pos' : 2)">
-            <i class="ri-arrow-left-line"></i> Back
-          </button>
-          <div class="onboard-header">
-            <h1>Almost done! 🎯</h1>
-            <p>Just a few details about your shop</p>
-          </div>
-
-          <form id="shop-basic-form" class="shop-basic-form">
-            <div class="form-group">
-              <label>Shop Name</label>
-              <input type="text" id="shop-onboard-name" placeholder="Your shop name" required>
-            </div>
-            <div class="form-group">
-              <label>Shop Category</label>
-              <select id="shop-category" required>
-                <option value="">Select category...</option>
+        <form id="setup-form" class="setup-form">
+          <div class="form-group">
+            <label>What type of place is this?</label>
+            <select id="setup-type" required>
+              <option value="">Select type...</option>
+              <optgroup label="Shops">
                 <option value="pharmacy">💊 Pharmacy</option>
                 <option value="grocery">🛒 Grocery Store</option>
-                <option value="restaurant">🍽️ Restaurant</option>
-                <option value="cafe">☕ Cafe</option>
-                <option value="bakery">🥐 Bakery</option>
                 <option value="electronics">📱 Electronics</option>
                 <option value="clothing">👕 Clothing</option>
                 <option value="beauty">💄 Beauty & Cosmetics</option>
                 <option value="hardware">🔨 Hardware</option>
-                <option value="other">📦 Other</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Phone Number</label>
-              <input type="tel" id="shop-phone" placeholder="+998 90 123 4567">
-            </div>
-            <button type="button" class="btn btn-primary btn-full" onclick="completeOnboarding()">
-              <span>Go to Dashboard</span>
-              <i class="ri-arrow-right-line"></i>
-            </button>
-          </form>
-        </div>
+                <option value="bookstore">📚 Bookstore</option>
+                <option value="shop_other">📦 Other Shop</option>
+              </optgroup>
+              <optgroup label="Food & Drink">
+                <option value="restaurant">🍽️ Restaurant</option>
+                <option value="cafe">☕ Cafe</option>
+                <option value="bakery">🥐 Bakery</option>
+                <option value="fastfood">🍔 Fast Food</option>
+                <option value="bar">🍺 Bar</option>
+              </optgroup>
+              <optgroup label="Services & Amenities">
+                <option value="hospital">🏥 Hospital / Clinic</option>
+                <option value="bank">🏦 Bank</option>
+                <option value="salon">💇 Salon / Barber</option>
+                <option value="gym">💪 Gym / Sports</option>
+                <option value="school">🏫 School / Education</option>
+                <option value="hotel">🏨 Hotel</option>
+                <option value="repair">🔧 Repair Service</option>
+                <option value="service_other">🏢 Other Service</option>
+              </optgroup>
+              <optgroup label="Recreation">
+                <option value="park">🌳 Park</option>
+                <option value="cinema">🎬 Cinema</option>
+                <option value="museum">🏛️ Museum</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Business Name</label>
+            <input type="text" id="setup-name" placeholder="Your business name" required>
+          </div>
+
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" id="setup-phone" placeholder="+998 90 123 4567">
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full">
+            <span>Continue</span>
+            <i class="ri-arrow-right-line"></i>
+          </button>
+        </form>
       </div>
     </div>
 
-    <!-- Dashboard -->
+    <!-- Main Dashboard -->
     <div id="dashboard-container" class="dashboard-container hidden">
       <!-- Sidebar -->
       <aside id="sidebar" class="sidebar">
@@ -329,14 +148,38 @@
           <img src="logo.png" alt="SHOXA" class="logo-icon">
           <span class="logo-text">SHOXA</span>
         </div>
-        <nav class="sidebar-nav" id="sidebar-nav">
-          <!-- Navigation items populated by JS based on business type -->
+        <nav class="sidebar-nav">
+          <a href="#" class="nav-item active" data-page="home">
+            <i class="ri-home-4-line"></i>
+            <span>Home</span>
+          </a>
+          <a href="#" class="nav-item" data-page="page">
+            <i class="ri-store-2-line"></i>
+            <span>My Page</span>
+          </a>
+          <a href="#" class="nav-item" data-page="products">
+            <i class="ri-shopping-bag-line"></i>
+            <span>Products</span>
+          </a>
+          <a href="#" class="nav-item" data-page="posts">
+            <i class="ri-image-line"></i>
+            <span>Posts</span>
+          </a>
+          <a href="#" class="nav-item" data-page="messages">
+            <i class="ri-message-3-line"></i>
+            <span>Messages</span>
+            <span class="nav-badge" id="messages-badge">0</span>
+          </a>
+          <a href="#" class="nav-item" data-page="stats">
+            <i class="ri-bar-chart-box-line"></i>
+            <span>Statistics</span>
+          </a>
         </nav>
         <div class="sidebar-footer">
-          <div class="user-info" id="user-info">
-            <span class="user-name">Shop Name</span>
-            <span class="user-type">Shop • Manual</span>
-          </div>
+          <a href="#" class="nav-item" data-page="settings">
+            <i class="ri-settings-3-line"></i>
+            <span>Settings</span>
+          </a>
           <button id="logout-btn" class="btn btn-ghost btn-full">
             <i class="ri-logout-box-line"></i>
             <span>Logout</span>
@@ -350,20 +193,450 @@
           <i class="ri-menu-line"></i>
         </button>
         <span class="logo-text">SHOXA</span>
-        <div class="header-actions">
-          <button id="mobile-logout" class="btn-icon">
-            <i class="ri-logout-box-line"></i>
-          </button>
-        </div>
+        <button id="mobile-notifications" class="btn-icon">
+          <i class="ri-notification-3-line"></i>
+        </button>
       </header>
 
       <!-- Main Content -->
-      <main class="main-content" id="main-content">
-        <!-- Pages will be dynamically generated based on business type -->
+      <main class="main-content">
+
+        <!-- HOME PAGE -->
+        <div id="page-home" class="page active">
+          <div class="page-header">
+            <div>
+              <h1 id="greeting">Welcome!</h1>
+              <p class="shop-name" id="home-shop-name">Your Business</p>
+            </div>
+          </div>
+
+          <!-- Quick Stats -->
+          <div class="quick-stats-grid">
+            <div class="quick-stat">
+              <div class="stat-icon views"><i class="ri-eye-line"></i></div>
+              <div class="stat-info">
+                <span class="stat-value" id="home-views">0</span>
+                <span class="stat-label">Page Views</span>
+              </div>
+            </div>
+            <div class="quick-stat">
+              <div class="stat-icon followers"><i class="ri-user-heart-line"></i></div>
+              <div class="stat-info">
+                <span class="stat-value" id="home-followers">0</span>
+                <span class="stat-label">Followers</span>
+              </div>
+            </div>
+            <div class="quick-stat">
+              <div class="stat-icon products"><i class="ri-shopping-bag-line"></i></div>
+              <div class="stat-info">
+                <span class="stat-value" id="home-products">0</span>
+                <span class="stat-label">Products</span>
+              </div>
+            </div>
+            <div class="quick-stat">
+              <div class="stat-icon messages"><i class="ri-message-3-line"></i></div>
+              <div class="stat-info">
+                <span class="stat-value" id="home-messages">0</span>
+                <span class="stat-label">Messages</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Messages -->
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="ri-message-3-line"></i> Recent Messages</h3>
+              <a href="#" onclick="navigateTo('messages'); return false;" class="view-all">View All</a>
+            </div>
+            <div id="recent-messages" class="messages-preview">
+              <div class="empty-state small">
+                <i class="ri-chat-1-line"></i>
+                <p>No messages yet</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="quick-actions">
+            <button class="quick-action-btn" onclick="navigateTo('posts'); openPostModal();">
+              <i class="ri-add-circle-line"></i>
+              Create Post
+            </button>
+            <button class="quick-action-btn" onclick="navigateTo('products'); openProductModal();">
+              <i class="ri-shopping-bag-line"></i>
+              Add Product
+            </button>
+            <button class="quick-action-btn" onclick="navigateTo('page');">
+              <i class="ri-edit-line"></i>
+              Edit Page
+            </button>
+          </div>
+        </div>
+
+        <!-- MY PAGE -->
+        <div id="page-page" class="page">
+          <div class="page-header">
+            <h1>My Page</h1>
+            <button class="btn btn-primary" onclick="savePage()">
+              <i class="ri-save-line"></i> Save Changes
+            </button>
+          </div>
+
+          <div class="page-editor-grid">
+            <!-- Basic Info -->
+            <div class="card">
+              <h3>Basic Information</h3>
+              <div class="form-group">
+                <label>Business Name</label>
+                <input type="text" id="page-name" placeholder="Your business name">
+              </div>
+              <div class="form-group">
+                <label>Type</label>
+                <select id="page-type"></select>
+              </div>
+              <div class="form-group">
+                <label>Phone</label>
+                <input type="tel" id="page-phone" placeholder="+998 90 123 4567">
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <textarea id="page-description" rows="3" placeholder="Tell customers about your business..."></textarea>
+              </div>
+            </div>
+
+            <!-- Images -->
+            <div class="card">
+              <h3>Images</h3>
+              <div class="images-upload-grid">
+                <div class="image-upload-box" id="logo-upload">
+                  <input type="file" id="logo-input" accept="image/*" hidden>
+                  <div class="upload-placeholder" onclick="document.getElementById('logo-input').click()">
+                    <i class="ri-image-add-line"></i>
+                    <span>Logo</span>
+                  </div>
+                  <img id="logo-preview" class="upload-preview hidden" alt="Logo">
+                </div>
+                <div class="image-upload-box banner" id="banner-upload">
+                  <input type="file" id="banner-input" accept="image/*" hidden>
+                  <div class="upload-placeholder" onclick="document.getElementById('banner-input').click()">
+                    <i class="ri-image-add-line"></i>
+                    <span>Banner Image</span>
+                  </div>
+                  <img id="banner-preview" class="upload-preview hidden" alt="Banner">
+                </div>
+              </div>
+            </div>
+
+            <!-- Location -->
+            <div class="card full-width">
+              <h3>Location</h3>
+              <div class="form-group">
+                <label>Address</label>
+                <input type="text" id="page-address" placeholder="Street address">
+              </div>
+              <div id="location-map" class="map-container"></div>
+              <p class="form-hint">Click on the map to set your exact location</p>
+            </div>
+
+            <!-- Opening Hours -->
+            <div class="card full-width">
+              <h3>Opening Hours</h3>
+              <div class="hours-editor" id="hours-editor">
+                <!-- Generated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PRODUCTS PAGE -->
+        <div id="page-products" class="page">
+          <div class="page-header">
+            <h1>Products</h1>
+            <div class="header-actions">
+              <button class="btn btn-ghost" onclick="importProducts()">
+                <i class="ri-upload-cloud-line"></i> Import
+              </button>
+              <button class="btn btn-primary" onclick="openProductModal()">
+                <i class="ri-add-line"></i> Add Product
+              </button>
+            </div>
+          </div>
+
+          <div class="products-toolbar">
+            <input type="text" id="product-search" placeholder="Search products..." class="search-input"
+              oninput="filterProducts()">
+            <select id="product-category-filter" onchange="filterProducts()">
+              <option value="">All Categories</option>
+            </select>
+          </div>
+
+          <div id="products-grid" class="products-grid">
+            <div class="empty-state">
+              <i class="ri-shopping-bag-line"></i>
+              <h3>No products yet</h3>
+              <p>Add your products so customers can see what you offer</p>
+              <button class="btn btn-primary" onclick="openProductModal()">Add Your First Product</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- POSTS PAGE -->
+        <div id="page-posts" class="page">
+          <div class="page-header">
+            <h1>Posts</h1>
+            <button class="btn btn-primary" onclick="openPostModal()">
+              <i class="ri-add-line"></i> Create Post
+            </button>
+          </div>
+
+          <div class="posts-tabs">
+            <button class="tab-btn active" data-tab="all">All Posts</button>
+            <button class="tab-btn" data-tab="stories">Stories</button>
+          </div>
+
+          <div id="posts-grid" class="posts-grid">
+            <div class="empty-state">
+              <i class="ri-image-line"></i>
+              <h3>No posts yet</h3>
+              <p>Share updates, promotions, and news with your customers</p>
+              <button class="btn btn-primary" onclick="openPostModal()">Create Your First Post</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MESSAGES PAGE -->
+        <div id="page-messages" class="page">
+          <div class="page-header">
+            <h1>Messages</h1>
+          </div>
+
+          <div class="messages-container">
+            <div class="messages-list" id="messages-list">
+              <div class="empty-state">
+                <i class="ri-message-3-line"></i>
+                <h3>No messages yet</h3>
+                <p>When customers contact you, their messages will appear here</p>
+              </div>
+            </div>
+
+            <div class="message-detail hidden" id="message-detail">
+              <div class="message-detail-header">
+                <button class="btn-icon" onclick="closeMessageDetail()">
+                  <i class="ri-arrow-left-line"></i>
+                </button>
+                <div class="customer-info">
+                  <span class="customer-name">Customer Name</span>
+                  <span class="customer-phone">+998 90 123 4567</span>
+                </div>
+              </div>
+              <div class="message-thread" id="message-thread"></div>
+              <div class="message-input-area">
+                <input type="text" id="reply-input" placeholder="Type your reply...">
+                <button class="btn btn-primary" onclick="sendReply()">
+                  <i class="ri-send-plane-fill"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATISTICS PAGE -->
+        <div id="page-stats" class="page">
+          <div class="page-header">
+            <h1>Statistics</h1>
+            <select id="stats-period" onchange="loadStats()">
+              <option value="7">Last 7 Days</option>
+              <option value="30" selected>Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+            </select>
+          </div>
+
+          <!-- Key Metrics -->
+          <div class="stats-kpi-grid">
+            <div class="stats-kpi">
+              <div class="kpi-icon"><i class="ri-eye-line"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-value" id="stat-total-views">0</span>
+                <span class="kpi-label">Total Views</span>
+                <span class="kpi-change positive" id="stat-views-change">+0%</span>
+              </div>
+            </div>
+            <div class="stats-kpi">
+              <div class="kpi-icon"><i class="ri-map-pin-line"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-value" id="stat-map-views">0</span>
+                <span class="kpi-label">Views from Map</span>
+                <span class="kpi-change positive">+0%</span>
+              </div>
+            </div>
+            <div class="stats-kpi">
+              <div class="kpi-icon"><i class="ri-search-line"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-value" id="stat-search-views">0</span>
+                <span class="kpi-label">From Search</span>
+                <span class="kpi-change positive">+0%</span>
+              </div>
+            </div>
+            <div class="stats-kpi">
+              <div class="kpi-icon"><i class="ri-timer-line"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-value" id="stat-avg-time">0s</span>
+                <span class="kpi-label">Avg. Time on Page</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="stats-charts-grid">
+            <div class="card chart-card">
+              <h3>Page Views Over Time</h3>
+              <canvas id="views-chart"></canvas>
+            </div>
+            <div class="card chart-card">
+              <h3>Traffic Sources</h3>
+              <canvas id="sources-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Engagement Stats -->
+          <div class="stats-engagement-grid">
+            <div class="card">
+              <h3>Engagement</h3>
+              <div class="engagement-stats">
+                <div class="engagement-item">
+                  <i class="ri-user-heart-line"></i>
+                  <div>
+                    <span class="eng-value" id="stat-new-followers">0</span>
+                    <span class="eng-label">New Followers</span>
+                  </div>
+                </div>
+                <div class="engagement-item">
+                  <i class="ri-phone-line"></i>
+                  <div>
+                    <span class="eng-value" id="stat-phone-clicks">0</span>
+                    <span class="eng-label">Phone Clicks</span>
+                  </div>
+                </div>
+                <div class="engagement-item">
+                  <i class="ri-map-pin-line"></i>
+                  <div>
+                    <span class="eng-value" id="stat-direction-clicks">0</span>
+                    <span class="eng-label">Get Directions</span>
+                  </div>
+                </div>
+                <div class="engagement-item">
+                  <i class="ri-message-3-line"></i>
+                  <div>
+                    <span class="eng-value" id="stat-messages-received">0</span>
+                    <span class="eng-label">Messages</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Top Products</h3>
+              <div id="top-products-stats" class="top-items-list">
+                <div class="empty-state small">
+                  <p>No product views yet</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Popular Posts</h3>
+              <div id="top-posts-stats" class="top-items-list">
+                <div class="empty-state small">
+                  <p>No post views yet</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Visitor Insights -->
+          <div class="card">
+            <h3>When People Visit</h3>
+            <canvas id="hours-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- SETTINGS PAGE -->
+        <div id="page-settings" class="page">
+          <div class="page-header">
+            <h1>Settings</h1>
+          </div>
+
+          <div class="settings-sections">
+            <div class="card">
+              <h3>Account</h3>
+              <div class="setting-item">
+                <div>
+                  <span class="setting-label">Email</span>
+                  <span class="setting-value" id="setting-email">user@example.com</span>
+                </div>
+              </div>
+              <div class="setting-item">
+                <span class="setting-label">Change Password</span>
+                <button class="btn btn-ghost">Change</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Notifications</h3>
+              <div class="setting-item">
+                <span class="setting-label">Email notifications for new messages</span>
+                <label class="toggle">
+                  <input type="checkbox" id="notif-email" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="setting-item">
+                <span class="setting-label">Email weekly stats report</span>
+                <label class="toggle">
+                  <input type="checkbox" id="notif-stats">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Product Import</h3>
+              <p class="text-muted">Import products from external systems</p>
+              <div class="import-options">
+                <button class="import-btn" onclick="importCSV()">
+                  <i class="ri-file-excel-2-line"></i>
+                  <span>Import CSV/Excel</span>
+                </button>
+                <button class="import-btn disabled" disabled>
+                  <i class="ri-database-2-line"></i>
+                  <span>1C Integration</span>
+                  <span class="coming-soon">Coming Soon</span>
+                </button>
+                <button class="import-btn disabled" disabled>
+                  <i class="ri-restaurant-line"></i>
+                  <span>iiko / R-Keeper</span>
+                  <span class="coming-soon">Coming Soon</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="card danger-zone">
+              <h3>Danger Zone</h3>
+              <div class="setting-item">
+                <div>
+                  <span class="setting-label">Delete Business</span>
+                  <span class="setting-desc">Permanently delete your business from SHOXA</span>
+                </div>
+                <button class="btn btn-danger">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </main>
     </div>
 
-    <!-- Modals -->
+    <!-- MODALS -->
 
     <!-- Product Modal -->
     <div id="product-modal" class="modal hidden">
@@ -378,50 +651,36 @@
         <form id="product-form" class="modal-body">
           <input type="hidden" id="product-id">
           <div class="form-group">
-            <label for="product-name">Product Name</label>
-            <input type="text" id="product-name" required>
+            <label>Product Name *</label>
+            <input type="text" id="product-name" required placeholder="e.g. Aspirin 500mg">
           </div>
           <div class="form-group">
-            <label for="product-sku">SKU / Barcode</label>
-            <input type="text" id="product-sku" placeholder="Auto-generated if empty">
+            <label>Category</label>
+            <input type="text" id="product-category" placeholder="e.g. Medicine, Electronics">
           </div>
           <div class="form-group">
-            <label for="product-description">Description</label>
-            <textarea id="product-description" rows="2"></textarea>
+            <label>Description</label>
+            <textarea id="product-description" rows="2" placeholder="Brief description..."></textarea>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label for="product-price">Price (UZS)</label>
-              <input type="number" id="product-price" step="100" required>
+              <label>Price (UZS) *</label>
+              <input type="number" id="product-price" required step="100" placeholder="50000">
             </div>
             <div class="form-group">
-              <label for="product-discount">Sale Price</label>
-              <input type="number" id="product-discount" step="100">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="product-stock">Stock Quantity</label>
-              <input type="number" id="product-stock" value="0">
-            </div>
-            <div class="form-group">
-              <label for="product-reorder">Low Stock Alert</label>
-              <input type="number" id="product-reorder" value="10">
+              <label>Sale Price</label>
+              <input type="number" id="product-sale-price" step="100" placeholder="Optional">
             </div>
           </div>
           <div class="form-group">
-            <label for="product-category">Category</label>
-            <input type="text" id="product-category" placeholder="e.g. Medicine, Food">
-          </div>
-          <div class="form-group">
-            <label>Product Image</label>
-            <div class="image-upload product-image-upload">
-              <input type="file" id="product-image-input" accept="image/*" hidden>
-              <div class="upload-placeholder" onclick="document.getElementById('product-image-input').click()">
+            <label>Image</label>
+            <div class="product-image-upload">
+              <input type="file" id="product-image" accept="image/*" hidden>
+              <div class="upload-area" onclick="document.getElementById('product-image').click()">
                 <i class="ri-image-add-line"></i>
                 <span>Upload Image</span>
               </div>
-              <img id="product-image-preview" class="upload-preview hidden" alt="Product">
+              <img id="product-image-preview" class="hidden" alt="Preview">
             </div>
           </div>
         </form>
@@ -442,69 +701,32 @@
             <i class="ri-close-line"></i>
           </button>
         </div>
-        <form id="post-form" class="modal-body">
+        <div class="modal-body">
           <div class="form-group">
-            <label for="post-content">What's new?</label>
-            <textarea id="post-content" rows="4" placeholder="Share updates, news, promotions..."></textarea>
+            <label>What's new?</label>
+            <textarea id="post-content" rows="4" placeholder="Share an update, promotion, or news..."></textarea>
           </div>
           <div class="form-group">
-            <label>Add Images</label>
-            <div class="image-upload post-image-upload">
-              <input type="file" id="post-image-input" accept="image/*" multiple hidden>
-              <div class="upload-placeholder" onclick="document.getElementById('post-image-input').click()">
+            <label>Add Image</label>
+            <div class="post-image-upload">
+              <input type="file" id="post-image" accept="image/*" hidden>
+              <div class="upload-area" onclick="document.getElementById('post-image').click()">
                 <i class="ri-image-add-line"></i>
-                <span>Add Images</span>
+                <span>Upload Image</span>
               </div>
             </div>
-            <div id="post-images-preview" class="images-preview"></div>
+            <div id="post-image-preview" class="image-preview-container"></div>
           </div>
           <div class="form-group checkbox-group">
-            <label>
+            <label class="checkbox-label">
               <input type="checkbox" id="post-is-story">
-              Post as Story (expires in 24 hours)
+              <span>Post as Story (expires in 24 hours)</span>
             </label>
           </div>
-        </form>
+        </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" onclick="closePostModal()">Cancel</button>
           <button class="btn btn-primary" onclick="savePost()">Publish</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Service Modal (for amenities) -->
-    <div id="service-modal" class="modal hidden">
-      <div class="modal-backdrop" onclick="closeServiceModal()"></div>
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Add Service</h2>
-          <button class="btn-icon" onclick="closeServiceModal()">
-            <i class="ri-close-line"></i>
-          </button>
-        </div>
-        <form id="service-form" class="modal-body">
-          <div class="form-group">
-            <label>Service Name</label>
-            <input type="text" id="service-name" required placeholder="e.g. General Consultation">
-          </div>
-          <div class="form-group">
-            <label>Description</label>
-            <textarea id="service-desc" rows="2" placeholder="What does this service include?"></textarea>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Price (UZS)</label>
-              <input type="number" id="service-price" placeholder="Optional">
-            </div>
-            <div class="form-group">
-              <label>Duration</label>
-              <input type="text" id="service-duration" placeholder="e.g. 30 min">
-            </div>
-          </div>
-        </form>
-        <div class="modal-footer">
-          <button class="btn btn-ghost" onclick="closeServiceModal()">Cancel</button>
-          <button class="btn btn-primary" onclick="saveService()">Save Service</button>
         </div>
       </div>
     </div>
@@ -514,7 +736,7 @@
       <span id="toast-message"></span>
     </div>
 
-    <!-- Loading Overlay -->
+    <!-- Loading -->
     <div id="loading" class="loading-overlay hidden">
       <div class="spinner"></div>
     </div>
@@ -532,16 +754,12 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Telegram Upload Helper -->
+  <!-- Telegram Upload -->
   <script src="js/telegram.js"></script>
 
-  <!-- App Scripts -->
+  <!-- App -->
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/onboarding.js"></script>
-  <script src="js/dashboard.js"></script>
-  <script src="js/products.js"></script>
-  <script src="js/posts.js"></script>
   <script src="js/app.js"></script>
 </body>
 
