@@ -472,45 +472,250 @@
         });
     }
 
-    // Hours editor
+    // Hours editor wizard
+    let scheduleType = 'standard';
+    let customHours = {};
+
     function initHoursEditor() {
-        const container = document.getElementById('hours-editor');
-        if (!container) return;
+        const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        // Initialize custom hours data
+        DAYS.forEach(day => {
+            customHours[day] = { open: '09:00', close: '18:00', closed: false };
+        });
 
-        container.innerHTML = days.map(day => `
-        <div class="hours-row">
-            <label>${day.slice(0, 3)}</label>
-            <input type="time" value="09:00" class="hour-start">
-            <input type="time" value="18:00" class="hour-end">
-            <label class="closed-toggle">
-                <input type="checkbox" class="hour-closed">
-                Closed
-            </label>
-        </div>
-    `).join('');
+        // Schedule type buttons
+        const typeButtons = document.querySelectorAll('.schedule-type-btn');
+        typeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                typeButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                scheduleType = btn.dataset.type;
+
+                // Show/hide custom editor
+                const customEditor = document.getElementById('hours-custom-editor');
+                if (scheduleType === 'custom') {
+                    customEditor.classList.remove('hidden');
+                    renderCustomEditor();
+                } else {
+                    customEditor.classList.add('hidden');
+                }
+
+                updateHoursPreview();
+            });
+        });
+
+        // Break time toggle
+        const breakToggle = document.getElementById('hours-has-break');
+        const breakRow = document.getElementById('break-times-row');
+        if (breakToggle && breakRow) {
+            breakToggle.addEventListener('change', () => {
+                breakRow.classList.toggle('hidden', !breakToggle.checked);
+                updateHoursPreview();
+            });
+        }
+
+        // Time inputs update preview
+        ['hours-default-open', 'hours-default-close', 'hours-break-start', 'hours-break-end'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('change', updateHoursPreview);
+            }
+        });
+
+        // Render custom editor for per-day editing
+        function renderCustomEditor() {
+            const container = document.getElementById('hours-custom-editor');
+            if (!container) return;
+
+            container.innerHTML = DAYS.map((day, i) => `
+                <div class="hours-custom-row" data-day="${day}">
+                    <label>${DAY_LABELS[i]}</label>
+                    <input type="time" class="custom-open" value="${customHours[day].open}">
+                    <input type="time" class="custom-close" value="${customHours[day].close}">
+                    <label class="closed-toggle">
+                        <input type="checkbox" class="custom-closed" ${customHours[day].closed ? 'checked' : ''}>
+                        Closed
+                    </label>
+                </div>
+            `).join('');
+
+            // Add change listeners
+            container.querySelectorAll('.hours-custom-row').forEach(row => {
+                const day = row.dataset.day;
+                row.querySelector('.custom-open').addEventListener('change', (e) => {
+                    customHours[day].open = e.target.value;
+                    updateHoursPreview();
+                });
+                row.querySelector('.custom-close').addEventListener('change', (e) => {
+                    customHours[day].close = e.target.value;
+                    updateHoursPreview();
+                });
+                row.querySelector('.custom-closed').addEventListener('change', (e) => {
+                    customHours[day].closed = e.target.checked;
+                    updateHoursPreview();
+                });
+            });
+        }
+
+        // Update preview grid
+        function updateHoursPreview() {
+            const grid = document.getElementById('hours-grid');
+            if (!grid) return;
+
+            const defaultOpen = document.getElementById('hours-default-open')?.value || '09:00';
+            const defaultClose = document.getElementById('hours-default-close')?.value || '18:00';
+            const hasBreak = document.getElementById('hours-has-break')?.checked;
+            const breakStart = document.getElementById('hours-break-start')?.value || '13:00';
+            const breakEnd = document.getElementById('hours-break-end')?.value || '14:00';
+
+            grid.innerHTML = DAYS.map((day, i) => {
+                let open, close, closed;
+
+                if (scheduleType === 'standard') {
+                    // Mon-Fri open, Sat-Sun closed
+                    closed = (i >= 5);
+                    open = defaultOpen;
+                    close = defaultClose;
+                } else if (scheduleType === 'everyday') {
+                    closed = false;
+                    open = defaultOpen;
+                    close = defaultClose;
+                } else {
+                    // Custom
+                    closed = customHours[day].closed;
+                    open = customHours[day].open;
+                    close = customHours[day].close;
+                }
+
+                const breakHtml = hasBreak && !closed
+                    ? `<div class="break-label">Break: ${breakStart} - ${breakEnd}</div>`
+                    : '';
+
+                return `
+                    <div class="hours-grid-item">
+                        <div class="day">${DAY_LABELS[i]}</div>
+                        ${closed
+                        ? '<div class="closed-label">Closed</div>'
+                        : `<div class="time">${open} - ${close}</div>${breakHtml}`}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Initial preview
+        updateHoursPreview();
     }
 
-    // Location map
-    let locationMap = null;
-    let locationMarker = null;
+    // Get opening hours data for saving to Firestore
+    function getOpeningHours() {
+        const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const defaultOpen = document.getElementById('hours-default-open')?.value || '09:00';
+        const defaultClose = document.getElementById('hours-default-close')?.value || '18:00';
+        const hasBreak = document.getElementById('hours-has-break')?.checked || false;
+        const breakStart = document.getElementById('hours-break-start')?.value || '13:00';
+        const breakEnd = document.getElementById('hours-break-end')?.value || '14:00';
+
+        const hours = {};
+        DAYS.forEach((day, i) => {
+            let dayData = { open: '', close: '', closed: false };
+
+            if (scheduleType === 'standard') {
+                dayData.closed = (i >= 5); // Sat-Sun closed
+                dayData.open = defaultOpen;
+                dayData.close = defaultClose;
+            } else if (scheduleType === 'everyday') {
+                dayData.open = defaultOpen;
+                dayData.close = defaultClose;
+            } else {
+                dayData = { ...customHours[day] };
+            }
+
+            if (hasBreak && !dayData.closed) {
+                dayData.breakStart = breakStart;
+                dayData.breakEnd = breakEnd;
+            }
+
+            hours[day] = dayData;
+        });
+
+        return { scheduleType, hours, hasBreak };
+    }
+
+    // Location map (Yandex Maps)
+    let yandexMap = null;
+    let locationPlacemark = null;
 
     function initLocationMap() {
         const container = document.getElementById('location-map');
-        if (!container || locationMap) return;
+        if (!container || yandexMap) return;
 
-        const lat = businessData?.location?.lat || 41.2995;
-        const lng = businessData?.location?.lng || 69.2401;
+        // Wait for Yandex Maps to be ready
+        if (typeof ymaps === 'undefined') {
+            console.warn('Yandex Maps not loaded yet, retrying...');
+            setTimeout(initLocationMap, 500);
+            return;
+        }
 
-        locationMap = L.map(container).setView([lat, lng], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(locationMap);
+        ymaps.ready(() => {
+            const lat = businessData?.location?.lat || 41.2995;
+            const lng = businessData?.location?.lng || 69.2401;
 
-        locationMarker = L.marker([lat, lng], { draggable: true }).addTo(locationMap);
+            yandexMap = new ymaps.Map(container, {
+                center: [lat, lng],
+                zoom: 16,
+                controls: ['zoomControl', 'fullscreenControl', 'geolocationControl']
+            });
 
-        locationMap.on('click', (e) => {
-            locationMarker.setLatLng(e.latlng);
+            // Create placemark (marker)
+            locationPlacemark = new ymaps.Placemark([lat, lng], {
+                balloonContent: 'Your business location'
+            }, {
+                draggable: true,
+                preset: 'islands#redDotIcon'
+            });
+
+            yandexMap.geoObjects.add(locationPlacemark);
+
+            // Click on map to move marker
+            yandexMap.events.add('click', (e) => {
+                const coords = e.get('coords');
+                locationPlacemark.geometry.setCoordinates(coords);
+                reverseGeocode(coords);
+            });
+
+            // Drag marker
+            locationPlacemark.events.add('dragend', () => {
+                const coords = locationPlacemark.geometry.getCoordinates();
+                reverseGeocode(coords);
+            });
+
+            // Load existing address
+            if (businessData?.address) {
+                document.getElementById('page-address').value = businessData.address;
+            }
         });
+    }
+
+    // Reverse geocode to get address from coordinates
+    function reverseGeocode(coords) {
+        ymaps.geocode(coords, { kind: 'house' }).then((res) => {
+            const firstGeoObject = res.geoObjects.get(0);
+            if (firstGeoObject) {
+                const address = firstGeoObject.getAddressLine();
+                document.getElementById('page-address').value = address;
+            }
+        });
+    }
+
+    // Get location coordinates for saving
+    function getLocationCoords() {
+        if (locationPlacemark) {
+            const coords = locationPlacemark.geometry.getCoordinates();
+            return { lat: coords[0], lng: coords[1] };
+        }
+        return null;
     }
 
     // Use current location (geolocation)
@@ -524,9 +729,10 @@
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
-                if (locationMap && locationMarker) {
-                    locationMap.setView([latitude, longitude], 16);
-                    locationMarker.setLatLng([latitude, longitude]);
+                if (yandexMap && locationPlacemark) {
+                    yandexMap.setCenter([latitude, longitude], 16);
+                    locationPlacemark.geometry.setCoordinates([latitude, longitude]);
+                    reverseGeocode([latitude, longitude]);
                     showToast('Location updated!');
                 }
             },
@@ -650,12 +856,12 @@
         console.log('addContactMethod called with type:', type);
         if (!type) return;
 
-        // Add new contact method to array
-        contactMethods.push({
-            type: type,
-            value: '',
-            label: type === 'other' ? '' : undefined
-        });
+        // Add new contact method to array (no undefined values!)
+        const newMethod = { type: type, value: '' };
+        if (type === 'other') {
+            newMethod.label = ''; // Only 'other' type has a label
+        }
+        contactMethods.push(newMethod);
 
         console.log('contactMethods array:', contactMethods);
 
@@ -702,79 +908,132 @@
         const uid = auth.currentUser?.uid;
         if (!uid) return;
 
+        // Helper to get value or empty string (Firestore doesn't allow undefined)
+        const getVal = (id) => document.getElementById(id)?.value || '';
+        const getChecked = (id) => document.getElementById(id)?.checked || false;
+
         const data = {
-            name: document.getElementById('page-name').value,
-            type: document.getElementById('page-type').value,
-            phone: document.getElementById('page-phone').value,
-            description: document.getElementById('page-description').value,
-            address: document.getElementById('page-address').value,
+            name: getVal('page-name'),
+            type: getVal('page-type'),
+            phone: getVal('page-phone'),
+            description: getVal('page-description'),
+            address: getVal('page-address'),
 
             // Contact methods array
             contactMethods: contactMethods.filter(m => m.value),
 
+            // Opening hours
+            openingHours: getOpeningHours(),
+
             // Amenities
             amenities: {
-                wifi: document.getElementById('page-wifi').checked,
-                parking: document.getElementById('page-parking').checked,
-                delivery: document.getElementById('page-delivery').checked,
-                takeaway: document.getElementById('page-takeaway').checked
+                wifi: getChecked('page-wifi'),
+                parking: getChecked('page-parking'),
+                delivery: getChecked('page-delivery'),
+                takeaway: getChecked('page-takeaway')
             },
 
             // Payment methods
             payments: {
-                cash: document.getElementById('page-pay-cash').checked,
-                uzcard: document.getElementById('page-pay-uzcard').checked,
-                humo: document.getElementById('page-pay-humo').checked,
-                visa: document.getElementById('page-pay-visa').checked,
-                other: document.getElementById('page-pay-other').checked,
-                otherName: document.getElementById('page-pay-other-name')?.value || ''
+                cash: getChecked('page-pay-cash'),
+                uzcard: getChecked('page-pay-uzcard'),
+                humo: getChecked('page-pay-humo'),
+                visa: getChecked('page-pay-visa'),
+                other: getChecked('page-pay-other'),
+                otherName: getVal('page-pay-other-name')
             },
 
             // Languages
             languages: {
-                uz: document.getElementById('page-lang-uz').checked,
-                ru: document.getElementById('page-lang-ru').checked,
-                en: document.getElementById('page-lang-en').checked,
-                other: document.getElementById('page-lang-other').checked,
-                otherName: document.getElementById('page-lang-other-name')?.value || ''
+                uz: getChecked('page-lang-uz'),
+                ru: getChecked('page-lang-ru'),
+                en: getChecked('page-lang-en'),
+                other: getChecked('page-lang-other'),
+                otherName: getVal('page-lang-other-name')
             },
 
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        if (locationMarker) {
-            const pos = locationMarker.getLatLng();
-            data.location = { lat: pos.lat, lng: pos.lng };
+        // Only add location if placemark exists (Yandex Maps)
+        const locationCoords = getLocationCoords();
+        if (locationCoords) {
+            data.location = locationCoords;
+        }
+
+        // Add logo/banner file IDs if uploaded
+        if (pendingLogoFileId) {
+            data.logoFileId = pendingLogoFileId;
+        }
+        if (pendingBannerFileId) {
+            data.bannerFileId = pendingBannerFileId;
         }
 
         showLoading();
+        console.log('savePage: Starting save with data:', data);
+        console.log('savePage: uid:', uid);
+        console.log('savePage: shopData:', shopData);
+
         try {
+            console.log('savePage: Updating businesses collection...');
             await db.collection('businesses').doc(uid).update(data);
+            console.log('savePage: businesses updated successfully');
 
             if (shopData?.id) {
-                await db.collection('shops').doc(shopData.id).update({
+                console.log('savePage: Updating shops collection for shop:', shopData.id);
+
+                // Build shop update data carefully to avoid undefined
+                const shopUpdate = {
+                    name: data.name,  // Mobile app uses this
                     name_uz: data.name,
                     name_en: data.name,
                     type: data.type,
                     phone: data.phone,
                     about: data.description,
                     address: data.address,
-                    location: data.location,
                     contactMethods: data.contactMethods,
+                    openingHours: data.openingHours,
                     amenities: data.amenities,
                     payments: data.payments,
                     languages: data.languages
-                });
+                };
+
+                // Only include location if it exists
+                if (data.location) {
+                    shopUpdate.location = data.location;
+                    // Also save at top level for mobile app distance calculation
+                    shopUpdate.latitude = data.location.lat;
+                    shopUpdate.longitude = data.location.lng;
+                }
+
+                // Only include logo/banner if uploaded
+                if (data.logoFileId) {
+                    shopUpdate.logoFileId = data.logoFileId;
+                }
+                if (data.bannerFileId) {
+                    shopUpdate.bannerFileId = data.bannerFileId;
+                }
+
+                await db.collection('shops').doc(shopData.id).update(shopUpdate);
+                console.log('savePage: shops updated successfully');
+            } else {
+                console.warn('savePage: No shopData.id, skipping shops update');
             }
 
             businessData = { ...businessData, ...data };
             showToast('Page saved!');
+            console.log('savePage: Complete!');
         } catch (error) {
-            showToast('Failed to save');
-            console.error(error);
+            showToast('Failed to save: ' + error.message);
+            console.error('savePage ERROR:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
         }
         hideLoading();
     }
+
+    // Expose to window for HTML onclick handlers
+    window.savePage = savePage;
 
     // Products
     let products = [];
@@ -819,8 +1078,8 @@
                 <div class="product-name">${p.name}</div>
                 ${p.category ? `<div class="product-category">${p.category}</div>` : ''}
                 <div class="product-price">
-                    ${formatPrice(p.salePrice || p.price)}
-                    ${p.salePrice ? `<span class="product-sale-price">${formatPrice(p.price)}</span>` : ''}
+                    ${formatPrice(p.discountPrice || p.price)}
+                    ${p.discountPrice ? `<span class="product-sale-price">${formatPrice(p.price)}</span>` : ''}
                 </div>
                 <div class="product-actions">
                     <button class="btn btn-ghost" onclick="editProduct('${p.id}')">
@@ -849,7 +1108,7 @@
             document.getElementById('product-category').value = product.category || '';
             document.getElementById('product-description').value = product.description || '';
             document.getElementById('product-price').value = product.price || '';
-            document.getElementById('product-sale-price').value = product.salePrice || '';
+            document.getElementById('product-sale-price').value = product.discountPrice || '';
         } else {
             document.getElementById('product-form').reset();
             document.getElementById('product-id').value = '';
@@ -867,7 +1126,7 @@
             category: document.getElementById('product-category').value,
             description: document.getElementById('product-description').value,
             price: parseFloat(document.getElementById('product-price').value) || 0,
-            salePrice: parseFloat(document.getElementById('product-sale-price').value) || null,
+            discountPrice: parseFloat(document.getElementById('product-sale-price').value) || null,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
@@ -877,6 +1136,26 @@
         }
 
         showLoading();
+
+        // Handle image upload to Telegram
+        const imageInput = document.getElementById('product-image');
+        if (imageInput && imageInput.files && imageInput.files[0]) {
+            console.log('Uploading product image to Telegram...');
+            try {
+                const result = await TelegramAPI.uploadFile(imageInput.files[0]);
+                if (result.success) {
+                    data.imageFileId = result.fileId;
+                    data.imageUrl = await TelegramAPI.getFileUrl(result.fileId);
+                    console.log('Image uploaded successfully:', data.imageUrl);
+                } else {
+                    console.error('Image upload failed:', result.error);
+                    showToast('Image upload failed: ' + result.error);
+                }
+            } catch (err) {
+                console.error('Image upload error:', err);
+            }
+        }
+
         try {
             const ref = db.collection('shops').doc(shopData.id).collection('products');
 
@@ -1142,7 +1421,82 @@
     }
 
     // Image uploads
+    let pendingLogoFileId = null;
+    let pendingBannerFileId = null;
+
     function setupImageUploads() {
+        // Logo upload
+        document.getElementById('logo-input')?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const preview = document.getElementById('logo-preview');
+            const placeholder = document.getElementById('logo-upload')?.querySelector('.upload-placeholder');
+
+            // Show preview immediately
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if (preview) {
+                    preview.src = ev.target.result;
+                    preview.classList.remove('hidden');
+                }
+                if (placeholder) placeholder.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+
+            // Upload to Telegram
+            showToast('Uploading logo...');
+            try {
+                const result = await TelegramAPI.uploadFile(file);
+                if (result.success) {
+                    pendingLogoFileId = result.fileId;
+                    showToast('Logo uploaded! Remember to save.');
+                    console.log('Logo uploaded, fileId:', result.fileId);
+                } else {
+                    showToast('Logo upload failed: ' + result.error);
+                }
+            } catch (err) {
+                console.error('Logo upload error:', err);
+                showToast('Logo upload error');
+            }
+        });
+
+        // Banner upload
+        document.getElementById('banner-input')?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const preview = document.getElementById('banner-preview');
+            const placeholder = document.getElementById('banner-upload')?.querySelector('.upload-placeholder');
+
+            // Show preview immediately
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if (preview) {
+                    preview.src = ev.target.result;
+                    preview.classList.remove('hidden');
+                }
+                if (placeholder) placeholder.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+
+            // Upload to Telegram
+            showToast('Uploading banner...');
+            try {
+                const result = await TelegramAPI.uploadFile(file);
+                if (result.success) {
+                    pendingBannerFileId = result.fileId;
+                    showToast('Banner uploaded! Remember to save.');
+                    console.log('Banner uploaded, fileId:', result.fileId);
+                } else {
+                    showToast('Banner upload failed: ' + result.error);
+                }
+            } catch (err) {
+                console.error('Banner upload error:', err);
+                showToast('Banner upload error');
+            }
+        });
+
         // Product image
         document.getElementById('product-image')?.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -1275,5 +1629,23 @@
             });
         }
     }
+
+    // Expose all functions needed by HTML onclick handlers
+    window.navigateTo = navigateTo;
+    window.openProductModal = openProductModal;
+    window.closeProductModal = closeProductModal;
+    window.saveProduct = saveProduct;
+    window.editProduct = editProduct;
+    window.deleteProduct = deleteProduct;
+    window.importProducts = importProducts;
+    window.openPostModal = openPostModal;
+    window.closePostModal = closePostModal;
+    window.savePost = savePost;
+    window.editPost = editPost;
+    window.deletePost = deletePost;
+    window.openMessage = openMessage;
+    window.closeMessageDetail = closeMessageDetail;
+    window.sendReply = sendReply;
+    window.importCSV = importCSV;
 
 })(); // End of IIFE

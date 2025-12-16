@@ -577,16 +577,16 @@ export default function ShopDetails() {
                 )}
               </View>
 
-              {/* Contact & Location */}
+              {/* Contact Methods */}
               <View style={styles.infoBlock}>
-                <Text style={styles.infoTitle}>Contact & Location</Text>
+                <Text style={styles.infoTitle}>Contact & Social</Text>
 
                 <TouchableOpacity style={styles.contactRow} onPress={() => setShowLocationModal(true)}>
                   <View style={styles.contactIconSmall}>
                     <Ionicons name="location-outline" size={18} color={COLORS.primary} />
                   </View>
                   <Text style={styles.contactText} numberOfLines={2}>
-                    {shop.location?.address || 'Location not set'}
+                    {shop.address || shop.location?.address || 'Location not set'}
                   </Text>
                 </TouchableOpacity>
 
@@ -599,38 +599,152 @@ export default function ShopDetails() {
                   </TouchableOpacity>
                 )}
 
-                {shop.website && (
-                  <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL(shop.website)}>
-                    <View style={styles.contactIconSmall}>
-                      <Ionicons name="globe-outline" size={18} color={COLORS.primary} />
-                    </View>
-                    <Text style={styles.contactText}>{shop.website}</Text>
-                  </TouchableOpacity>
-                )}
+                {/* Dynamic Contact Methods */}
+                {shop.contactMethods?.map((contact: any, idx: number) => {
+                  const getIcon = (type: string) => {
+                    const icons: { [key: string]: string } = {
+                      phone: 'call-outline', whatsapp: 'logo-whatsapp', telegram: 'paper-plane-outline',
+                      instagram: 'logo-instagram', facebook: 'logo-facebook', tiktok: 'musical-notes-outline',
+                      website: 'globe-outline', email: 'mail-outline', other: 'link-outline'
+                    };
+                    return icons[type] || 'link-outline';
+                  };
+
+                  const handlePress = () => {
+                    const value = contact.value;
+                    if (contact.type === 'phone' || contact.type === 'whatsapp') {
+                      Linking.openURL(`tel:${value}`);
+                    } else if (contact.type === 'email') {
+                      Linking.openURL(`mailto:${value}`);
+                    } else if (contact.type === 'telegram') {
+                      const tgLink = value.startsWith('@') ? `https://t.me/${value.slice(1)}` : value;
+                      Linking.openURL(tgLink);
+                    } else if (contact.type === 'instagram') {
+                      const igLink = value.startsWith('@') ? `https://instagram.com/${value.slice(1)}` : value;
+                      Linking.openURL(igLink);
+                    } else if (value.startsWith('http')) {
+                      Linking.openURL(value);
+                    }
+                  };
+
+                  return (
+                    <TouchableOpacity key={idx} style={styles.contactRow} onPress={handlePress}>
+                      <View style={styles.contactIconSmall}>
+                        <Ionicons name={getIcon(contact.type) as any} size={18} color={COLORS.primary} />
+                      </View>
+                      <Text style={styles.contactText}>
+                        {contact.label || contact.type.charAt(0).toUpperCase() + contact.type.slice(1)}: {contact.value}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
-              {/* Amenities */}
+              {/* Amenities - Dynamic from Firestore */}
               <View style={styles.infoBlock}>
                 <Text style={styles.infoTitle}>Amenities</Text>
                 <View style={styles.amenitiesGrid}>
-                  <View style={styles.amenityItem}>
-                    <Ionicons name="car-outline" size={20} color={COLORS.primary} />
-                    <Text style={styles.amenityText}>Parking{'\n'}Available</Text>
-                  </View>
-                  <View style={styles.amenityItem}>
-                    <Ionicons name="accessibility-outline" size={20} color={COLORS.primary} />
-                    <Text style={styles.amenityText}>Wheelchair{'\n'}Access</Text>
-                  </View>
-                  <View style={styles.amenityItem}>
-                    <Ionicons name="wifi-outline" size={20} color={COLORS.primary} />
-                    <Text style={styles.amenityText}>Free{'\n'}Wi-Fi</Text>
-                  </View>
-                  <View style={styles.amenityItem}>
-                    <Ionicons name="card-outline" size={20} color={COLORS.primary} />
-                    <Text style={styles.amenityText}>Contactless{'\n'}Pay</Text>
-                  </View>
+                  {shop.amenities?.wifi && (
+                    <View style={styles.amenityItem}>
+                      <Ionicons name="wifi-outline" size={20} color={COLORS.primary} />
+                      <Text style={styles.amenityText}>Free{'\n'}Wi-Fi</Text>
+                    </View>
+                  )}
+                  {shop.amenities?.parking && (
+                    <View style={styles.amenityItem}>
+                      <Ionicons name="car-outline" size={20} color={COLORS.primary} />
+                      <Text style={styles.amenityText}>Parking{'\n'}Available</Text>
+                    </View>
+                  )}
+                  {shop.amenities?.delivery && (
+                    <View style={styles.amenityItem}>
+                      <Ionicons name="bicycle-outline" size={20} color={COLORS.primary} />
+                      <Text style={styles.amenityText}>Delivery{'\n'}Available</Text>
+                    </View>
+                  )}
+                  {shop.amenities?.takeaway && (
+                    <View style={styles.amenityItem}>
+                      <Ionicons name="bag-handle-outline" size={20} color={COLORS.primary} />
+                      <Text style={styles.amenityText}>Takeaway{'\n'}Available</Text>
+                    </View>
+                  )}
+                  {!shop.amenities?.wifi && !shop.amenities?.parking && !shop.amenities?.delivery && !shop.amenities?.takeaway && (
+                    <Text style={styles.infoText}>No amenities listed</Text>
+                  )}
                 </View>
               </View>
+
+              {/* Payment Methods */}
+              {shop.payments && (
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>Payment Methods</Text>
+                  <View style={styles.amenitiesGrid}>
+                    {shop.payments.cash && (
+                      <View style={styles.amenityItem}>
+                        <Ionicons name="cash-outline" size={20} color={COLORS.primary} />
+                        <Text style={styles.amenityText}>Cash</Text>
+                      </View>
+                    )}
+                    {shop.payments.uzcard && (
+                      <View style={styles.amenityItem}>
+                        <Ionicons name="card-outline" size={20} color={COLORS.primary} />
+                        <Text style={styles.amenityText}>Uzcard</Text>
+                      </View>
+                    )}
+                    {shop.payments.humo && (
+                      <View style={styles.amenityItem}>
+                        <Ionicons name="card-outline" size={20} color={COLORS.primary} />
+                        <Text style={styles.amenityText}>Humo</Text>
+                      </View>
+                    )}
+                    {shop.payments.visa && (
+                      <View style={styles.amenityItem}>
+                        <Ionicons name="card-outline" size={20} color={COLORS.primary} />
+                        <Text style={styles.amenityText}>Visa/MC</Text>
+                      </View>
+                    )}
+                    {shop.payments.other && shop.payments.otherName && (
+                      <View style={styles.amenityItem}>
+                        <Ionicons name="wallet-outline" size={20} color={COLORS.primary} />
+                        <Text style={styles.amenityText}>{shop.payments.otherName}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Languages Spoken */}
+              {shop.languages && (
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>Languages Spoken</Text>
+                  <View style={styles.amenitiesGrid}>
+                    {shop.languages.uz && (
+                      <View style={styles.amenityItem}>
+                        <Text style={{ fontSize: 20 }}>🇺🇿</Text>
+                        <Text style={styles.amenityText}>O'zbek</Text>
+                      </View>
+                    )}
+                    {shop.languages.ru && (
+                      <View style={styles.amenityItem}>
+                        <Text style={{ fontSize: 20 }}>🇷🇺</Text>
+                        <Text style={styles.amenityText}>Русский</Text>
+                      </View>
+                    )}
+                    {shop.languages.en && (
+                      <View style={styles.amenityItem}>
+                        <Text style={{ fontSize: 20 }}>🇬🇧</Text>
+                        <Text style={styles.amenityText}>English</Text>
+                      </View>
+                    )}
+                    {shop.languages.other && shop.languages.otherName && (
+                      <View style={styles.amenityItem}>
+                        <Text style={{ fontSize: 20 }}>🌍</Text>
+                        <Text style={styles.amenityText}>{shop.languages.otherName}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
             </View>
           )}
         </View>

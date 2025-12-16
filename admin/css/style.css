@@ -1785,3 +1785,186 @@ body {
   width: 100%;
   max-width: 300px;
 }
+
+/* Opening Hours Wizard */
+.hours-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.schedule-type-btns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.schedule-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.schedule-type-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.schedule-type-btn.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+}
+
+.schedule-type-btn.active small {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.schedule-type-btn i {
+  font-size: 24px;
+}
+
+.schedule-type-btn span {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.schedule-type-btn small {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+/* Custom Days Editor */
+.hours-custom-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--background);
+  border-radius: var(--radius-sm);
+}
+
+.hours-custom-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.hours-custom-row label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.hours-custom-row input[type="time"] {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.hours-custom-row .closed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Hours Preview Grid */
+.hours-preview {
+  margin-top: 8px;
+}
+
+.hours-preview>label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.hours-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.hours-grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: var(--background);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.hours-grid-item .day {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.hours-grid-item .time {
+  font-size: 14px;
+  color: var(--primary);
+}
+
+.hours-grid-item .closed-label {
+  font-size: 13px;
+  color: #E53935;
+}
+
+.hours-grid-item .break-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+@media (max-width: 600px) {
+  .schedule-type-btns {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .hours-custom-row {
+    grid-template-columns: 50px 1fr 1fr;
+  }
+
+  .hours-custom-row .closed-toggle {
+    grid-column: span 3;
+    margin-top: 4px;
+  }
+}
