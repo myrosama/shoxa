@@ -700,12 +700,31 @@
 
     // Reverse geocode to get address from coordinates
     function reverseGeocode(coords) {
+        console.log('Reverse geocoding coordinates:', coords);
+
         ymaps.geocode(coords, { kind: 'house' }).then((res) => {
             const firstGeoObject = res.geoObjects.get(0);
             if (firstGeoObject) {
                 const address = firstGeoObject.getAddressLine();
-                document.getElementById('page-address').value = address;
+                console.log('Geocoded address:', address);
+
+                const addressInput = document.getElementById('page-address');
+                if (addressInput) {
+                    addressInput.value = address;
+                    // Highlight the field briefly to show it updated
+                    addressInput.style.backgroundColor = '#e8f5e9';
+                    setTimeout(() => {
+                        addressInput.style.backgroundColor = '';
+                    }, 1500);
+                }
+                showToast('📍 Address updated!');
+            } else {
+                console.warn('No address found for coordinates');
+                showToast('Could not get address for this location');
             }
+        }).catch((err) => {
+            console.error('Geocoding error:', err);
+            showToast('Geocoding failed');
         });
     }
 
