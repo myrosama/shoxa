@@ -27,6 +27,8 @@
             setupNavigation();
             setupMobileMenu();
             setupImageUploads();
+            setupContactMethods();
+            setupOtherFieldToggles();
             console.log('UI setup complete');
 
             // Auth state listener
@@ -142,13 +144,39 @@
         }
     }
 
-    // Update home stats
-    function updateHomeStats() {
-        // Demo data - in production, fetch from Firestore
-        document.getElementById('home-views').textContent = '234';
-        document.getElementById('home-followers').textContent = '12';
-        document.getElementById('home-products').textContent = '45';
-        document.getElementById('home-messages').textContent = '3';
+    // Update home stats with real data
+    async function updateHomeStats() {
+        // Get real counts from Firestore
+        let productsCount = 0;
+        let messagesCount = 0;
+        let viewsCount = 0;
+        let followersCount = 0;
+
+        if (shopData?.id) {
+            try {
+                // Count products
+                const productsSnap = await db.collection('shops').doc(shopData.id)
+                    .collection('products').get();
+                productsCount = productsSnap.size;
+
+                // Count messages
+                const messagesSnap = await db.collection('messages')
+                    .where('shopId', '==', shopData.id)
+                    .get();
+                messagesCount = messagesSnap.size;
+
+                // Views and followers from shop data
+                viewsCount = shopData.views || 0;
+                followersCount = shopData.followers || 0;
+            } catch (e) {
+                console.error('Error fetching stats:', e);
+            }
+        }
+
+        document.getElementById('home-views').textContent = viewsCount;
+        document.getElementById('home-followers').textContent = followersCount;
+        document.getElementById('home-products').textContent = productsCount;
+        document.getElementById('home-messages').textContent = messagesCount;
     }
 
     // Initialize charts
@@ -485,14 +513,188 @@
         });
     }
 
+    // Use current location (geolocation)
+    window.useCurrentLocation = function () {
+        if (!navigator.geolocation) {
+            showToast('Geolocation is not supported by your browser');
+            return;
+        }
+
+        showToast('Getting your location...');
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                if (locationMap && locationMarker) {
+                    locationMap.setView([latitude, longitude], 16);
+                    locationMarker.setLatLng([latitude, longitude]);
+                    showToast('Location updated!');
+                }
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                showToast('Could not get your location. Please enable location access.');
+            },
+            { enableHighAccuracy: true }
+        );
+    };
+
     // Load page data
     function loadPageData() {
         if (!businessData) return;
 
+        // Basic info
         document.getElementById('page-name').value = businessData.name || '';
+        document.getElementById('page-type').value = businessData.type || '';
         document.getElementById('page-phone').value = businessData.phone || '';
         document.getElementById('page-description').value = businessData.description || '';
         document.getElementById('page-address').value = businessData.address || '';
+
+        // Load contact methods
+        loadContactMethods(businessData.contactMethods || []);
+
+        // Amenities
+        document.getElementById('page-wifi').checked = businessData.amenities?.wifi || false;
+        document.getElementById('page-parking').checked = businessData.amenities?.parking || false;
+        document.getElementById('page-delivery').checked = businessData.amenities?.delivery || false;
+        document.getElementById('page-takeaway').checked = businessData.amenities?.takeaway || false;
+
+        // Payment methods
+        document.getElementById('page-pay-cash').checked = businessData.payments?.cash !== false;
+        document.getElementById('page-pay-uzcard').checked = businessData.payments?.uzcard || false;
+        document.getElementById('page-pay-humo').checked = businessData.payments?.humo || false;
+        document.getElementById('page-pay-visa').checked = businessData.payments?.visa || false;
+        document.getElementById('page-pay-other').checked = businessData.payments?.other || false;
+        if (businessData.payments?.otherName) {
+            document.getElementById('page-pay-other-name').value = businessData.payments.otherName;
+        }
+        toggleOtherField('page-pay-other', 'other-payment-field');
+
+        // Languages
+        document.getElementById('page-lang-uz').checked = businessData.languages?.uz !== false;
+        document.getElementById('page-lang-ru').checked = businessData.languages?.ru || false;
+        document.getElementById('page-lang-en').checked = businessData.languages?.en || false;
+        document.getElementById('page-lang-other').checked = businessData.languages?.other || false;
+        if (businessData.languages?.otherName) {
+            document.getElementById('page-lang-other-name').value = businessData.languages.otherName;
+        }
+        toggleOtherField('page-lang-other', 'other-language-field');
+    }
+
+    // Contact methods management
+    let contactMethods = [];
+
+    function loadContactMethods(methods) {
+        contactMethods = methods || [];
+        renderContactMethods();
+    }
+
+    function renderContactMethods() {
+        const list = document.getElementById('contact-methods-list');
+        console.log('renderContactMethods called, list element:', list);
+        console.log('contactMethods to render:', contactMethods);
+
+        if (!list) {
+            console.error('contact-methods-list element not found!');
+            return;
+        }
+
+        if (contactMethods.length === 0) {
+            list.innerHTML = '<p style="color: var(--text-muted); font-size: 14px;">No contact methods added yet. Select one above.</p>';
+            return;
+        }
+
+        list.innerHTML = contactMethods.map((method, index) => {
+            const icons = {
+                phone: '📞', whatsapp: '💬', telegram: '✈️', instagram: '📷',
+                facebook: '📘', tiktok: '🎵', website: '🌐', email: '📧', other: '🔗'
+            };
+            const labels = {
+                phone: 'Phone', whatsapp: 'WhatsApp', telegram: 'Telegram', instagram: 'Instagram',
+                facebook: 'Facebook', tiktok: 'TikTok', website: 'Website', email: 'Email', other: method.label || 'Other'
+            };
+            const isOther = method.type === 'other';
+
+            return `
+                <div class="contact-method-item ${isOther ? 'other' : ''}" data-index="${index}">
+                    <div class="contact-method-icon">${icons[method.type] || '🔗'}</div>
+                    <div class="contact-method-info">
+                        ${isOther ? `<input type="text" class="contact-method-name-input" value="${method.label || ''}" placeholder="Name" onchange="updateContactLabel(${index}, this.value)">` : `<div class="contact-method-label">${labels[method.type]}</div>`}
+                        <input type="text" class="contact-method-value" value="${method.value || ''}" placeholder="${getPlaceholder(method.type)}" onchange="updateContactValue(${index}, this.value)">
+                    </div>
+                    <button type="button" class="contact-method-delete" onclick="removeContactMethod(${index})">
+                        <i class="ri-close-line"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        console.log('Rendered HTML:', list.innerHTML);
+    }
+
+    function getPlaceholder(type) {
+        const placeholders = {
+            phone: '+998 90 123 4567',
+            whatsapp: '+998 90 123 4567',
+            telegram: '@username or link',
+            instagram: '@username',
+            facebook: 'facebook.com/yourpage',
+            tiktok: '@username',
+            website: 'https://your-website.com',
+            email: 'contact@business.com',
+            other: 'Enter link or value'
+        };
+        return placeholders[type] || 'Enter value';
+    }
+
+    window.addContactMethod = function (type) {
+        console.log('addContactMethod called with type:', type);
+        if (!type) return;
+
+        // Add new contact method to array
+        contactMethods.push({
+            type: type,
+            value: '',
+            label: type === 'other' ? '' : undefined
+        });
+
+        console.log('contactMethods array:', contactMethods);
+
+        // Re-render the list
+        renderContactMethods();
+
+        // Reset the dropdown
+        const select = document.getElementById('contact-type-select');
+        if (select) select.value = '';
+    };
+
+    window.removeContactMethod = function (index) {
+        contactMethods.splice(index, 1);
+        renderContactMethods();
+    };
+
+    window.updateContactValue = function (index, value) {
+        if (contactMethods[index]) {
+            contactMethods[index].value = value;
+        }
+    };
+
+    window.updateContactLabel = function (index, label) {
+        if (contactMethods[index]) {
+            contactMethods[index].label = label;
+        }
+    };
+
+    // Toggle Other field visibility
+    function toggleOtherField(checkboxId, fieldId) {
+        const checkbox = document.getElementById(checkboxId);
+        const field = document.getElementById(fieldId);
+        if (checkbox && field) {
+            if (checkbox.checked) {
+                field.classList.remove('hidden');
+            } else {
+                field.classList.add('hidden');
+            }
+        }
     }
 
     // Save page
@@ -502,9 +704,41 @@
 
         const data = {
             name: document.getElementById('page-name').value,
+            type: document.getElementById('page-type').value,
             phone: document.getElementById('page-phone').value,
             description: document.getElementById('page-description').value,
             address: document.getElementById('page-address').value,
+
+            // Contact methods array
+            contactMethods: contactMethods.filter(m => m.value),
+
+            // Amenities
+            amenities: {
+                wifi: document.getElementById('page-wifi').checked,
+                parking: document.getElementById('page-parking').checked,
+                delivery: document.getElementById('page-delivery').checked,
+                takeaway: document.getElementById('page-takeaway').checked
+            },
+
+            // Payment methods
+            payments: {
+                cash: document.getElementById('page-pay-cash').checked,
+                uzcard: document.getElementById('page-pay-uzcard').checked,
+                humo: document.getElementById('page-pay-humo').checked,
+                visa: document.getElementById('page-pay-visa').checked,
+                other: document.getElementById('page-pay-other').checked,
+                otherName: document.getElementById('page-pay-other-name')?.value || ''
+            },
+
+            // Languages
+            languages: {
+                uz: document.getElementById('page-lang-uz').checked,
+                ru: document.getElementById('page-lang-ru').checked,
+                en: document.getElementById('page-lang-en').checked,
+                other: document.getElementById('page-lang-other').checked,
+                otherName: document.getElementById('page-lang-other-name')?.value || ''
+            },
+
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
@@ -521,10 +755,15 @@
                 await db.collection('shops').doc(shopData.id).update({
                     name_uz: data.name,
                     name_en: data.name,
+                    type: data.type,
                     phone: data.phone,
                     about: data.description,
                     address: data.address,
-                    location: data.location
+                    location: data.location,
+                    contactMethods: data.contactMethods,
+                    amenities: data.amenities,
+                    payments: data.payments,
+                    languages: data.languages
                 });
             }
 
@@ -1000,6 +1239,40 @@
             msg.textContent = message;
             toast.classList.remove('hidden');
             setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+    }
+
+    // Setup contact methods dropdown
+    function setupContactMethods() {
+        const select = document.getElementById('contact-type-select');
+        console.log('setupContactMethods called, select element:', select);
+        if (select) {
+            select.addEventListener('change', (e) => {
+                console.log('Contact select changed:', e.target.value);
+                addContactMethod(e.target.value);
+            });
+            console.log('Contact methods event listener attached');
+        } else {
+            console.error('contact-type-select element not found!');
+        }
+    }
+
+    // Setup Other field toggles
+    function setupOtherFieldToggles() {
+        // Payment Other toggle
+        const payOther = document.getElementById('page-pay-other');
+        if (payOther) {
+            payOther.addEventListener('change', () => {
+                toggleOtherField('page-pay-other', 'other-payment-field');
+            });
+        }
+
+        // Language Other toggle
+        const langOther = document.getElementById('page-lang-other');
+        if (langOther) {
+            langOther.addEventListener('change', () => {
+                toggleOtherField('page-lang-other', 'other-language-field');
+            });
         }
     }
 

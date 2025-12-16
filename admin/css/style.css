@@ -1550,3 +1550,238 @@ body {
     flex: 100%;
   }
 }
+
+/* Input with Prefix */
+.input-with-prefix {
+  display: flex;
+  align-items: stretch;
+}
+
+.input-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.input-with-prefix input {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
+  flex: 1;
+}
+
+/* Amenities Grid */
+.amenities-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.amenity-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--background);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.amenity-toggle:hover {
+  background: #EDE3D3;
+}
+
+.amenity-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.amenity-toggle span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.amenity-toggle input:checked+span {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* Payment Methods */
+.payment-methods,
+.language-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.payment-toggle,
+.lang-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--background);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.payment-toggle:hover,
+.lang-toggle:hover {
+  background: #EDE3D3;
+}
+
+.payment-toggle input,
+.lang-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.payment-toggle input:checked+span,
+.lang-toggle input:checked+span {
+  font-weight: 500;
+}
+
+/* Map Controls */
+.map-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.map-controls .btn {
+  font-size: 13px;
+  padding: 8px 16px;
+}
+
+@media (max-width: 768px) {
+  .amenities-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Contact Methods */
+.contact-methods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.contact-method-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--background);
+  border-radius: var(--radius-sm);
+}
+
+.contact-method-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+
+.contact-method-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-method-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.contact-method-value {
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  outline: none;
+}
+
+.contact-method-delete {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.contact-method-delete:hover {
+  background: #FEE2E2;
+  color: var(--error);
+}
+
+/* Other contact type has two inputs */
+.contact-method-item.other .contact-method-info {
+  display: flex;
+  gap: 8px;
+}
+
+.contact-method-name-input {
+  width: 100px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.add-contact-row {
+  padding-top: 8px;
+}
+
+.add-contact-row select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.add-contact-row select:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Other field toggles */
+.other-field {
+  padding-left: 8px;
+}
+
+.other-field input {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  width: 100%;
+  max-width: 300px;
+}

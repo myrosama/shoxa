@@ -292,7 +292,41 @@
               </div>
               <div class="form-group">
                 <label>Type</label>
-                <select id="page-type"></select>
+                <select id="page-type">
+                  <option value="">Select type...</option>
+                  <optgroup label="Shops">
+                    <option value="pharmacy">💊 Pharmacy</option>
+                    <option value="grocery">🛒 Grocery Store</option>
+                    <option value="electronics">📱 Electronics</option>
+                    <option value="clothing">👕 Clothing</option>
+                    <option value="beauty">💄 Beauty & Cosmetics</option>
+                    <option value="hardware">🔨 Hardware</option>
+                    <option value="bookstore">📚 Bookstore</option>
+                    <option value="shop_other">📦 Other Shop</option>
+                  </optgroup>
+                  <optgroup label="Food & Drink">
+                    <option value="restaurant">🍽️ Restaurant</option>
+                    <option value="cafe">☕ Cafe</option>
+                    <option value="bakery">🥐 Bakery</option>
+                    <option value="fastfood">🍔 Fast Food</option>
+                    <option value="bar">🍺 Bar</option>
+                  </optgroup>
+                  <optgroup label="Services & Amenities">
+                    <option value="hospital">🏥 Hospital / Clinic</option>
+                    <option value="bank">🏦 Bank</option>
+                    <option value="salon">💇 Salon / Barber</option>
+                    <option value="gym">💪 Gym / Sports</option>
+                    <option value="school">🏫 School / Education</option>
+                    <option value="hotel">🏨 Hotel</option>
+                    <option value="repair">🔧 Repair Service</option>
+                    <option value="service_other">🏢 Other Service</option>
+                  </optgroup>
+                  <optgroup label="Recreation">
+                    <option value="park">🌳 Park</option>
+                    <option value="cinema">🎬 Cinema</option>
+                    <option value="museum">🏛️ Museum</option>
+                  </optgroup>
+                </select>
               </div>
               <div class="form-group">
                 <label>Phone</label>
@@ -301,6 +335,31 @@
               <div class="form-group">
                 <label>Description</label>
                 <textarea id="page-description" rows="3" placeholder="Tell customers about your business..."></textarea>
+              </div>
+            </div>
+
+            <!-- Contact Methods -->
+            <div class="card">
+              <h3><i class="ri-links-line"></i> Contact Methods</h3>
+              <p class="form-hint" style="margin-bottom: 16px;">Add ways customers can reach you</p>
+
+              <div id="contact-methods-list" class="contact-methods-list">
+                <!-- Contact methods will be added dynamically -->
+              </div>
+
+              <div class="add-contact-row">
+                <select id="contact-type-select">
+                  <option value="">Add contact method...</option>
+                  <option value="phone">📞 Phone</option>
+                  <option value="whatsapp">💬 WhatsApp</option>
+                  <option value="telegram">✈️ Telegram</option>
+                  <option value="instagram">📷 Instagram</option>
+                  <option value="facebook">📘 Facebook</option>
+                  <option value="tiktok">🎵 TikTok</option>
+                  <option value="website">🌐 Website</option>
+                  <option value="email">📧 Email</option>
+                  <option value="other">🔗 Other</option>
+                </select>
               </div>
             </div>
 
@@ -327,6 +386,81 @@
               </div>
             </div>
 
+            <!-- Amenities & Services -->
+            <div class="card">
+              <h3><i class="ri-service-line"></i> Amenities & Services</h3>
+              <div class="amenities-grid">
+                <label class="amenity-toggle">
+                  <input type="checkbox" id="page-wifi">
+                  <span><i class="ri-wifi-line"></i> Free WiFi</span>
+                </label>
+                <label class="amenity-toggle">
+                  <input type="checkbox" id="page-parking">
+                  <span><i class="ri-parking-line"></i> Parking</span>
+                </label>
+                <label class="amenity-toggle">
+                  <input type="checkbox" id="page-delivery">
+                  <span><i class="ri-truck-line"></i> Delivery</span>
+                </label>
+                <label class="amenity-toggle">
+                  <input type="checkbox" id="page-takeaway">
+                  <span><i class="ri-shopping-bag-3-line"></i> Takeaway</span>
+                </label>
+              </div>
+              <div class="form-group" style="margin-top: 16px;">
+                <label>Payment Methods</label>
+                <div class="payment-methods">
+                  <label class="payment-toggle">
+                    <input type="checkbox" id="page-pay-cash" checked>
+                    <span>💵 Cash</span>
+                  </label>
+                  <label class="payment-toggle">
+                    <input type="checkbox" id="page-pay-uzcard">
+                    <span>💳 Uzcard</span>
+                  </label>
+                  <label class="payment-toggle">
+                    <input type="checkbox" id="page-pay-humo">
+                    <span>💳 Humo</span>
+                  </label>
+                  <label class="payment-toggle">
+                    <input type="checkbox" id="page-pay-visa">
+                    <span>💳 Visa/MC</span>
+                  </label>
+                  <label class="payment-toggle">
+                    <input type="checkbox" id="page-pay-other">
+                    <span>🔗 Other</span>
+                  </label>
+                </div>
+                <div id="other-payment-field" class="other-field hidden" style="margin-top: 8px;">
+                  <input type="text" id="page-pay-other-name" placeholder="Other payment method name">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Languages Spoken</label>
+                <div class="language-toggles">
+                  <label class="lang-toggle">
+                    <input type="checkbox" id="page-lang-uz" checked>
+                    <span>🇺🇿 O'zbek</span>
+                  </label>
+                  <label class="lang-toggle">
+                    <input type="checkbox" id="page-lang-ru">
+                    <span>🇷🇺 Русский</span>
+                  </label>
+                  <label class="lang-toggle">
+                    <input type="checkbox" id="page-lang-en">
+                    <span>🇬🇧 English</span>
+                  </label>
+                  <label class="lang-toggle">
+                    <input type="checkbox" id="page-lang-other">
+                    <span>🌍 Other</span>
+                  </label>
+                </div>
+                <div id="other-language-field" class="other-field hidden" style="margin-top: 8px;">
+                  <input type="text" id="page-lang-other-name" placeholder="Other language name">
+                </div>
+              </div>
+            </div>
+
             <!-- Location -->
             <div class="card full-width">
               <h3>Location</h3>
@@ -334,8 +468,13 @@
                 <label>Address</label>
                 <input type="text" id="page-address" placeholder="Street address">
               </div>
+              <div class="map-controls">
+                <button type="button" class="btn btn-ghost" onclick="useCurrentLocation()">
+                  <i class="ri-focus-3-line"></i> Use My Location
+                </button>
+              </div>
               <div id="location-map" class="map-container"></div>
-              <p class="form-hint">Click on the map to set your exact location</p>
+              <p class="form-hint">Click on the map or use the button above to set your location</p>
             </div>
 
             <!-- Opening Hours -->
