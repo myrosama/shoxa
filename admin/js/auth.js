@@ -9,7 +9,7 @@ const Auth = {
             if (user) {
                 this.currentUser = user;
                 await this.loadUserData();
-                this.showDashboard();
+                await this.handlePostLogin();
             } else {
                 this.currentUser = null;
                 this.userData = null;
@@ -21,7 +21,7 @@ const Auth = {
     // Load user data from Firestore
     async loadUserData() {
         try {
-            const doc = await db.collection(COLLECTIONS.USERS).doc(this.currentUser.uid).get();
+            const doc = await db.collection('users').doc(this.currentUser.uid).get();
             if (doc.exists) {
                 this.userData = { id: doc.id, ...doc.data() };
             }
@@ -30,41 +30,38 @@ const Auth = {
         }
     },
 
-    // Register new user
-    async register(name, email, password, shopType) {
+    // Handle post-login flow
+    async handlePostLogin() {
+        hideLoading();
+
+        // Check if user needs onboarding
+        const needsOnboarding = await Onboarding.checkOnboardingStatus();
+
+        if (needsOnboarding) {
+            this.showOnboarding();
+        } else {
+            this.showDashboard();
+        }
+    },
+
+    // Register new user (simplified - no shop type, goes to onboarding)
+    async register(name, email, password) {
         showLoading();
         try {
             // Create auth user
             const userCredential = await auth.createUserWithEmailAndPassword(email, password);
             const user = userCredential.user;
 
-            // Create shop document
-            const shopRef = await db.collection(COLLECTIONS.SHOPS).add({
-                ownerId: user.uid,
-                name: '',
-                type: shopType,
-                description: '',
-                about: '',
-                location: null,
-                openingHours: {},
-                logoFileId: null,
-                bannerFileId: null,
-                rating: 0,
-                reviewCount: 0,
-                isVerified: false,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
             // Create user document
-            await db.collection(COLLECTIONS.USERS).doc(user.uid).set({
+            await db.collection('users').doc(user.uid).set({
                 email: email,
                 name: name,
-                shopId: shopRef.id,
                 role: 'owner',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            showToast('Account created successfully!');
+            showToast('Account created! Let\'s set up your business.');
+            // Auth state change will trigger onboarding
             return { success: true };
         } catch (error) {
             hideLoading();
@@ -100,57 +97,88 @@ const Auth = {
     // Show auth container
     showAuth() {
         document.getElementById('auth-container').classList.remove('hidden');
+        document.getElementById('onboarding-container').classList.add('hidden');
         document.getElementById('dashboard-container').classList.add('hidden');
         hideLoading();
+    },
+
+    // Show onboarding
+    showOnboarding() {
+        document.getElementById('auth-container').classList.add('hidden');
+        document.getElementById('onboarding-container').classList.remove('hidden');
+        document.getElementById('dashboard-container').classList.add('hidden');
+
+        // Initialize onboarding
+        Onboarding.init();
     },
 
     // Show dashboard
     showDashboard() {
         document.getElementById('auth-container').classList.add('hidden');
+        document.getElementById('onboarding-container').classList.add('hidden');
         document.getElementById('dashboard-container').classList.remove('hidden');
-        hideLoading();
 
-        // Initialize dashboard
-        App.init();
+        // Initialize dashboard with business type
+        const businessType = Onboarding.selectedBusinessType || 'shop';
+        const shopMode = Onboarding.selectedShopMode || 'manual';
+        Dashboard.init(businessType, shopMode);
     }
 };
 
 // Setup auth form listeners
 document.addEventListener('DOMContentLoaded', () => {
     // Login form
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
-        await Auth.login(email, password);
-    });
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            await Auth.login(email, password);
+        });
+    }
 
-    // Register form
-    document.getElementById('register-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const name = document.getElementById('register-name').value;
-        const email = document.getElementById('register-email').value;
-        const password = document.getElementById('register-password').value;
-        const shopType = document.getElementById('shop-type').value;
-        await Auth.register(name, email, password, shopType);
-    });
+    // Register form (simplified - no shop type selection)
+    const registerForm = document.getElementById('register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('register-name').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            await Auth.register(name, email, password);
+        });
+    }
 
     // Toggle between login/register
-    document.getElementById('show-register').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('login-page').classList.add('hidden');
-        document.getElementById('register-page').classList.remove('hidden');
-    });
+    const showRegister = document.getElementById('show-register');
+    if (showRegister) {
+        showRegister.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('register-page').classList.remove('hidden');
+        });
+    }
 
-    document.getElementById('show-login').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('register-page').classList.add('hidden');
-        document.getElementById('login-page').classList.remove('hidden');
-    });
+    const showLogin = document.getElementById('show-login');
+    if (showLogin) {
+        showLogin.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('register-page').classList.add('hidden');
+            document.getElementById('login-page').classList.remove('hidden');
+        });
+    }
 
     // Logout buttons
-    document.getElementById('logout-btn').addEventListener('click', () => Auth.logout());
-    document.getElementById('mobile-logout').addEventListener('click', () => Auth.logout());
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => Auth.logout());
+    }
+
+    const mobileLogout = document.getElementById('mobile-logout');
+    if (mobileLogout) {
+        mobileLogout.addEventListener('click', () => Auth.logout());
+    }
 
     // Initialize auth
     Auth.init();
