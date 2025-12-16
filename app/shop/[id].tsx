@@ -360,7 +360,7 @@ export default function ShopDetails() {
               </View>
               {/* Full Address Below Name */}
               <Text style={styles.shopAddress} numberOfLines={1}>
-                {shop.location?.address || 'Location not set'}
+                {shop.address || shop.location?.address || 'Location not set'}
               </Text>
             </View>
 
@@ -771,7 +771,7 @@ export default function ShopDetails() {
             </View>
 
             <Text style={styles.modalShopName}>{shop.name}</Text>
-            <Text style={styles.modalAddress}>{shop.location?.address || 'Location not set'}</Text>
+            <Text style={styles.modalAddress}>{shop.address || shop.location?.address || 'Location not set'}</Text>
             <Text style={styles.modalDistance}>
               {shop?.latitude && shop?.longitude
                 ? `${calculateDistance(shop.latitude, shop.longitude)} away`
