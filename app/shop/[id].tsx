@@ -36,6 +36,7 @@ const COLORS = {
   white: '#FFFFFF',
   green: '#4CAF50',
   red: '#E53935',
+  orange: '#FF9800',
   cream: '#FFF8F0',
   storyGradient: ['#FF6B6B', '#FFE66D', '#4ECDC4', '#45B7D1', '#96E6A1'] as const,
 };
@@ -44,14 +45,26 @@ const COLORS = {
 const getOpenStatus = (openingHours: any): { isOpen: boolean; statusText: string; statusColor: string } => {
   if (!openingHours) return { isOpen: false, statusText: 'Hours not set', statusColor: COLORS.gray };
 
+  // Handle new structure: openingHours.hours.monday, etc.
+  const hoursData = openingHours.hours || openingHours;
+
   const now = new Date();
   const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const today = days[now.getDay()];
   const currentTime = now.getHours() * 60 + now.getMinutes();
 
-  const todayHours = openingHours[today];
-  if (!todayHours || !todayHours.open || !todayHours.close) {
+  const todayHours = hoursData[today];
+  if (!todayHours) {
+    return { isOpen: false, statusText: 'Hours not set', statusColor: COLORS.gray };
+  }
+
+  // Check if explicitly marked as closed
+  if (todayHours.closed) {
     return { isOpen: false, statusText: 'Closed today', statusColor: COLORS.red };
+  }
+
+  if (!todayHours.open || !todayHours.close) {
+    return { isOpen: false, statusText: 'Hours not set', statusColor: COLORS.gray };
   }
 
   const [openHour, openMin] = todayHours.open.split(':').map(Number);
@@ -60,12 +73,13 @@ const getOpenStatus = (openingHours: any): { isOpen: boolean; statusText: string
   const closeTime = closeHour * 60 + closeMin;
 
   if (currentTime >= openTime && currentTime < closeTime) {
-    const closeHourFormatted = closeHour > 12 ? `${closeHour - 12} PM` : `${closeHour} AM`;
-    return { isOpen: true, statusText: `Open until ${closeHourFormatted}`, statusColor: COLORS.green };
+    const closeFormatted = closeHour >= 12 ? `${closeHour > 12 ? closeHour - 12 : 12}:${String(closeMin).padStart(2, '0')} PM` : `${closeHour}:${String(closeMin).padStart(2, '0')} AM`;
+    return { isOpen: true, statusText: `Open until ${closeFormatted}`, statusColor: COLORS.green };
   } else if (currentTime < openTime) {
-    return { isOpen: false, statusText: `Opens ${todayHours.open}`, statusColor: COLORS.red };
+    const openFormatted = openHour >= 12 ? `${openHour > 12 ? openHour - 12 : 12}:${String(openMin).padStart(2, '0')} PM` : `${openHour}:${String(openMin).padStart(2, '0')} AM`;
+    return { isOpen: false, statusText: `Opens at ${openFormatted}`, statusColor: COLORS.orange };
   } else {
-    return { isOpen: false, statusText: 'Closed', statusColor: COLORS.red };
+    return { isOpen: false, statusText: 'Closed now', statusColor: COLORS.red };
   }
 };
 
@@ -565,13 +579,37 @@ export default function ShopDetails() {
               {/* Store Hours */}
               <View style={styles.infoBlock}>
                 <Text style={styles.infoTitle}>Store Hours</Text>
-                {shop.openingHours ? (
-                  Object.entries(shop.openingHours).map(([day, hours]: [string, any]) => (
-                    <View key={day} style={styles.hoursRow}>
-                      <Text style={styles.dayLabel}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
-                      <Text style={styles.hoursText}>{hours.open} - {hours.close}</Text>
-                    </View>
-                  ))
+                {shop.openingHours?.hours ? (
+                  <View style={styles.hoursContainer}>
+                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
+                      const dayHours = shop.openingHours.hours[day];
+                      const dayNames: { [key: string]: string } = {
+                        monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed',
+                        thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun'
+                      };
+                      const isToday = new Date().toLocaleString('en-US', { weekday: 'long' }).toLowerCase() === day;
+
+                      return (
+                        <View key={day} style={[styles.hoursRow, isToday && styles.hoursRowToday]}>
+                          <Text style={[styles.dayLabel, isToday && styles.dayLabelToday]}>{dayNames[day]}</Text>
+                          {dayHours?.closed ? (
+                            <Text style={styles.closedText}>Closed</Text>
+                          ) : dayHours?.open && dayHours?.close ? (
+                            <View style={styles.hoursTimeContainer}>
+                              <Text style={[styles.hoursText, isToday && styles.hoursTextToday]}>
+                                {dayHours.open} - {dayHours.close}
+                              </Text>
+                              {dayHours.breakStart && dayHours.breakEnd && (
+                                <Text style={styles.breakText}>Break: {dayHours.breakStart}-{dayHours.breakEnd}</Text>
+                              )}
+                            </View>
+                          ) : (
+                            <Text style={styles.hoursText}>-</Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
                 ) : (
                   <Text style={styles.infoText}>Hours not set</Text>
                 )}
@@ -1234,20 +1272,56 @@ const styles = StyleSheet.create({
     color: COLORS.dark,
     lineHeight: 22,
   },
+  hoursContainer: {
+    borderRadius: 12,
+    backgroundColor: COLORS.lightGray,
+    padding: 8,
+    marginTop: 8,
+  },
   hoursRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  hoursRowToday: {
+    backgroundColor: COLORS.primary,
+    marginBottom: 4,
   },
   dayLabel: {
     fontSize: 14,
+    fontWeight: '500',
     color: COLORS.dark,
+    width: 40,
+  },
+  dayLabelToday: {
+    color: COLORS.white,
+    fontWeight: '700',
+  },
+  hoursTimeContainer: {
+    alignItems: 'flex-end',
   },
   hoursText: {
     fontSize: 14,
     color: COLORS.gray,
+    fontWeight: '500',
+  },
+  hoursTextToday: {
+    color: COLORS.white,
+    fontWeight: '700',
+  },
+  closedText: {
+    fontSize: 14,
+    color: COLORS.red,
+    fontWeight: '500',
+  },
+  breakText: {
+    fontSize: 11,
+    color: COLORS.gray,
+    marginTop: 2,
   },
   contactRow: {
     flexDirection: 'row',
