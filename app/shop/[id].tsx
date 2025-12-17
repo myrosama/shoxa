@@ -1,5 +1,6 @@
 import { getTelegramImageUrl } from '@/configs/AppConfig';
 import { db } from '@/configs/FirebaseConfig';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { useLocation } from '@/contexts/LocationContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -99,7 +100,6 @@ export default function ShopDetails() {
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [hasStory, setHasStory] = useState(false);
   const [hasNewPosts, setHasNewPosts] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
   const [openStatus, setOpenStatus] = useState({ isOpen: false, statusText: '', statusColor: COLORS.gray });
   const [showLocationModal, setShowLocationModal] = useState(false);
 
@@ -224,8 +224,28 @@ export default function ShopDetails() {
     }
   };
 
-  const toggleFollow = () => {
-    setIsFollowing(!isFollowing);
+  // Follow functionality with auth check
+  const { isAuthenticated, isFollowing: checkIsFollowing, followShop, unfollowShop } = useAuth();
+  const isFollowingShop = shop?.id ? checkIsFollowing(shop.id) : false;
+
+  const toggleFollow = async () => {
+    if (!isAuthenticated) {
+      // Prompt to sign in
+      router.push('/auth/login');
+      return;
+    }
+
+    if (!shop?.id) return;
+
+    try {
+      if (isFollowingShop) {
+        await unfollowShop(shop.id);
+      } else {
+        await followShop(shop.id);
+      }
+    } catch (error) {
+      console.error('Follow error:', error);
+    }
   };
 
   // Track which cards have expanded controls
@@ -380,11 +400,11 @@ export default function ShopDetails() {
 
             {/* Follow Button Only */}
             <TouchableOpacity
-              style={[styles.followBtn, isFollowing && styles.followingBtn]}
+              style={[styles.followBtn, isFollowingShop && styles.followingBtn]}
               onPress={toggleFollow}
             >
-              <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
-                {isFollowing ? 'Following' : 'Follow'}
+              <Text style={[styles.followBtnText, isFollowingShop && styles.followingBtnText]}>
+                {isFollowingShop ? 'Following' : 'Follow'}
               </Text>
             </TouchableOpacity>
           </View>

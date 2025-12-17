@@ -803,6 +803,9 @@
             document.getElementById('page-lang-other-name').value = businessData.languages.otherName;
         }
         toggleOtherField('page-lang-other', 'other-language-field');
+
+        // Load followers
+        loadFollowers();
     }
 
     // Contact methods management
@@ -908,6 +911,80 @@
             contactMethods[index].label = label;
         }
     };
+
+    // Load followers for admin
+    async function loadFollowers() {
+        if (!shopData?.id) {
+            console.log('No shop data to load followers');
+            return;
+        }
+
+        try {
+            // Get the shop document to get followers array
+            const shopDoc = await db.collection('shops').doc(shopData.id).get();
+            const followers = shopDoc.data()?.followers || [];
+            const followerCount = followers.length;
+
+            // Update count display
+            const countEl = document.getElementById('follower-count');
+            if (countEl) countEl.textContent = followerCount;
+
+            const listEl = document.getElementById('followers-list');
+            if (!listEl) return;
+
+            if (followerCount === 0) {
+                listEl.innerHTML = '<p class="empty-state">No followers yet. Share your shop link to get followers!</p>';
+                return;
+            }
+
+            // Fetch user profiles for each follower (limit to first 20)
+            const followerProfiles = [];
+            const limitedFollowers = followers.slice(0, 20);
+
+            for (const userId of limitedFollowers) {
+                try {
+                    const userDoc = await db.collection('users').doc(userId).get();
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        followerProfiles.push({
+                            id: userId,
+                            displayName: userData.displayName || userData.email?.split('@')[0] || 'User',
+                            photoUrl: userData.photoUrl,
+                            createdAt: userData.createdAt
+                        });
+                    }
+                } catch (e) {
+                    console.error('Error fetching user:', userId);
+                }
+            }
+
+            // Render follower cards
+            listEl.innerHTML = followerProfiles.map(user => {
+                const initial = (user.displayName || 'U').charAt(0).toUpperCase();
+                const avatar = user.photoUrl
+                    ? `<img src="${user.photoUrl}" alt="${user.displayName}">`
+                    : initial;
+
+                return `
+                    <div class="follower-card">
+                        <div class="follower-avatar">${avatar}</div>
+                        <div class="follower-info">
+                            <div class="follower-name">${user.displayName}</div>
+                            <div class="follower-date">Follower</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // If there are more followers than shown
+            if (followerCount > 20) {
+                listEl.innerHTML += `<p class="text-muted" style="text-align:center; grid-column: 1/-1;">+${followerCount - 20} more followers</p>`;
+            }
+
+        } catch (error) {
+            console.error('Error loading followers:', error);
+        }
+    }
 
     // Toggle Other field visibility
     function toggleOtherField(checkboxId, fieldId) {
