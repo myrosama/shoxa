@@ -1,15 +1,15 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
+    Dimensions,
     Image,
     Keyboard,
     KeyboardAvoidingView,
     Platform,
-    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -19,78 +19,124 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const COLORS = {
-    background: '#FDF6E3',
+    background: '#FFFFFF',
     primary: '#C67C43',
     primaryLight: '#F5D6BA',
     primaryDark: '#A05A2C',
     dark: '#333333',
     gray: '#888888',
-    lightGray: '#E0E0E0',
+    lightGray: '#F5F5F5',
+    border: '#E8E8E8',
     white: '#FFFFFF',
-    green: '#4CAF50',
     red: '#E53935',
 };
 
-type AuthMode = 'input' | 'signin' | 'signup';
+type InputMode = 'phone' | 'email';
+type AuthStep = 'input' | 'password' | 'otp';
 
 export default function LoginScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { signInWithEmail, signUpWithEmail, isLoading: authLoading } = useAuth();
 
+    const [inputMode, setInputMode] = useState<InputMode>('phone');
+    const [step, setStep] = useState<AuthStep>('input');
+    const [phoneNumber, setPhoneNumber] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [displayName, setDisplayName] = useState('');
-    const [mode, setMode] = useState<AuthMode>('input');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-    // Animation refs
-    const fadeAnim = useRef(new Animated.Value(1)).current;
-    const slideAnim = useRef(new Animated.Value(0)).current;
+    // Animation for content shift on keyboard
+    const contentShift = useRef(new Animated.Value(0)).current;
+    const logoScale = useRef(new Animated.Value(1)).current;
 
-    // Check if input is email
-    const isEmailFormat = (text: string) => {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+    // Keyboard listeners
+    useEffect(() => {
+        const showSub = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            (e) => {
+                setKeyboardVisible(true);
+                Animated.parallel([
+                    Animated.timing(contentShift, {
+                        toValue: -SCREEN_HEIGHT * 0.12,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(logoScale, {
+                        toValue: 0.7,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+            }
+        );
+
+        const hideSub = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => {
+                setKeyboardVisible(false);
+                Animated.parallel([
+                    Animated.timing(contentShift, {
+                        toValue: 0,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(logoScale, {
+                        toValue: 1,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+            }
+        );
+
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
+
+    // Format phone number for display
+    const formatPhoneDisplay = (num: string) => {
+        const cleaned = num.replace(/\D/g, '');
+        if (cleaned.length <= 2) return cleaned;
+        if (cleaned.length <= 5) return `${cleaned.slice(0, 2)} ${cleaned.slice(2)}`;
+        if (cleaned.length <= 7) return `${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)} ${cleaned.slice(5)}`;
+        return `${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)} ${cleaned.slice(5, 7)} ${cleaned.slice(7, 9)}`;
+    };
+
+    // Handle continue with phone
+    const handlePhoneContinue = () => {
+        const cleaned = phoneNumber.replace(/\D/g, '');
+        if (cleaned.length < 9) {
+            setError('Please enter a valid phone number');
+            return;
+        }
+        setError('');
+        // TODO: Implement OTP flow
+        setError('SMS verification coming soon!');
     };
 
     // Handle continue with email
-    const handleContinue = async () => {
-        if (!email.trim()) {
-            setError('Please enter your email');
-            return;
-        }
-
-        if (!isEmailFormat(email)) {
+    const handleEmailContinue = async () => {
+        if (!email.trim() || !email.includes('@')) {
             setError('Please enter a valid email');
             return;
         }
-
         setError('');
-
-        // Animate transition
-        Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 0,
-                duration: 150,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            // For now, assume new user - in production, check email existence
-            setMode('signup');
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
-            }).start();
-        });
+        setStep('password');
     };
 
-    // Handle sign in
-    const handleSignIn = async () => {
-        if (!password) {
-            setError('Please enter your password');
+    // Handle sign in/up with password
+    const handlePasswordSubmit = async () => {
+        if (!password || password.length < 6) {
+            setError('Password must be at least 6 characters');
             return;
         }
 
@@ -101,65 +147,43 @@ export default function LoginScreen() {
             await signInWithEmail(email, password);
             router.back();
         } catch (err: any) {
-            setError(err.message || 'Sign in failed');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Handle sign up
-    const handleSignUp = async () => {
-        if (!displayName.trim()) {
-            setError('Please enter your name');
-            return;
-        }
-        if (!password || password.length < 6) {
-            setError('Password must be at least 6 characters');
-            return;
-        }
-
-        setIsLoading(true);
-        setError('');
-
-        try {
-            await signUpWithEmail(email, password, displayName);
-            router.back();
-        } catch (err: any) {
-            // If user exists, switch to sign in mode
-            if (err.message.includes('already in use')) {
-                setMode('signin');
-                setError('Account exists. Please sign in.');
+            // If user doesn't exist, try sign up
+            if (err.message.includes('user-not-found') || err.message.includes('invalid-credential')) {
+                try {
+                    await signUpWithEmail(email, password, email.split('@')[0]);
+                    router.back();
+                } catch (signUpErr: any) {
+                    setError(signUpErr.message || 'Authentication failed');
+                }
             } else {
-                setError(err.message || 'Sign up failed');
+                setError(err.message || 'Sign in failed');
             }
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Handle social login
+    // Social login handlers
     const handleGoogleSignIn = () => {
-        // TODO: Implement Google Sign In
         setError('Google Sign In coming soon!');
     };
 
     const handleAppleSignIn = () => {
-        // TODO: Implement Apple Sign In  
         setError('Apple Sign In coming soon!');
     };
 
-    // Switch between signin/signup
-    const toggleMode = () => {
+    // Toggle between phone and email
+    const toggleInputMode = () => {
+        setInputMode(inputMode === 'phone' ? 'email' : 'phone');
         setError('');
-        setMode(mode === 'signin' ? 'signup' : 'signin');
+        setStep('input');
     };
 
-    // Go back to email input
-    const goBack = () => {
-        if (mode !== 'input') {
-            setMode('input');
+    // Go back
+    const handleBack = () => {
+        if (step !== 'input') {
+            setStep('input');
             setPassword('');
-            setDisplayName('');
             setError('');
         } else {
             router.back();
@@ -168,188 +192,212 @@ export default function LoginScreen() {
 
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <KeyboardAvoidingView
-                style={[styles.container, { paddingTop: insets.top }]}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            >
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={goBack} style={styles.backBtn}>
-                        <Ionicons name={mode === 'input' ? "close" : "arrow-back"} size={28} color={COLORS.dark} />
-                    </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                    style={styles.content}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
+            <View style={[styles.container, { paddingTop: insets.top }]}>
+                {/* Close Button - Fixed at top */}
+                <TouchableOpacity
+                    style={[styles.closeBtn, { top: insets.top + 8 }]}
+                    onPress={handleBack}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                    {/* Logo Area */}
-                    <View style={styles.logoArea}>
-                        <View style={styles.logoContainer}>
+                    <Ionicons
+                        name={step === 'input' ? "close" : "arrow-back"}
+                        size={26}
+                        color={COLORS.dark}
+                    />
+                </TouchableOpacity>
+
+                <KeyboardAvoidingView
+                    style={styles.keyboardView}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+                >
+                    <Animated.View
+                        style={[
+                            styles.content,
+                            { transform: [{ translateY: contentShift }] }
+                        ]}
+                    >
+                        {/* Logo - Clean, no background */}
+                        <Animated.View
+                            style={[
+                                styles.logoArea,
+                                { transform: [{ scale: logoScale }] }
+                            ]}
+                        >
                             <Image
                                 source={require('@/assets/logo.png')}
                                 style={styles.logo}
                                 resizeMode="contain"
                             />
-                        </View>
-                        <Text style={styles.title}>
-                            {mode === 'input' ? 'Welcome to SHOXA' :
-                                mode === 'signin' ? 'Welcome Back!' : 'Create Account'}
-                        </Text>
-                        <Text style={styles.subtitle}>
-                            {mode === 'input'
-                                ? 'Follow your favorite shops and get personalized updates'
-                                : mode === 'signin'
-                                    ? 'Sign in to access your account'
-                                    : 'Join SHOXA to follow shops and discover local businesses'}
-                        </Text>
-                    </View>
+                        </Animated.View>
 
-                    <Animated.View style={[styles.formArea, { opacity: fadeAnim }]}>
-                        {/* Email Input - Always shown */}
-                        <View style={styles.inputSection}>
-                            <Text style={styles.inputLabel}>Email</Text>
-                            <View style={[styles.inputContainer, mode !== 'input' && styles.inputDisabled]}>
-                                <Ionicons name="mail-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter your email"
-                                    placeholderTextColor={COLORS.gray}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    value={email}
-                                    onChangeText={(text) => {
-                                        setEmail(text);
-                                        setError('');
-                                    }}
-                                    editable={mode === 'input'}
-                                />
-                                {mode !== 'input' && (
-                                    <TouchableOpacity onPress={() => setMode('input')} style={styles.editBtn}>
-                                        <Ionicons name="pencil" size={16} color={COLORS.primary} />
+                        {/* Title */}
+                        <Text style={styles.title}>SHOXA'ga kiring</Text>
+                        <Text style={styles.subtitle}>
+                            {step === 'input'
+                                ? 'Sevimli do\'konlaringizni kuzating'
+                                : 'Parolingizni kiriting'}
+                        </Text>
+
+                        {/* Input Section */}
+                        <View style={styles.formArea}>
+                            {step === 'input' && inputMode === 'phone' && (
+                                <>
+                                    {/* Phone Input */}
+                                    <View style={styles.phoneRow}>
+                                        <View style={styles.countryCode}>
+                                            <Text style={styles.countryFlag}>🇺🇿</Text>
+                                            <Text style={styles.countryCodeText}>+998</Text>
+                                        </View>
+                                        <TextInput
+                                            style={styles.phoneInput}
+                                            placeholder="90 123 45 67"
+                                            placeholderTextColor={COLORS.gray}
+                                            keyboardType="phone-pad"
+                                            value={formatPhoneDisplay(phoneNumber)}
+                                            onChangeText={(text) => {
+                                                setPhoneNumber(text.replace(/\D/g, '').slice(0, 9));
+                                                setError('');
+                                            }}
+                                            maxLength={12}
+                                        />
+                                    </View>
+
+                                    {/* Toggle to email */}
+                                    <TouchableOpacity onPress={toggleInputMode} style={styles.toggleLink}>
+                                        <Text style={styles.toggleText}>
+                                            Email orqali kirish
+                                        </Text>
+                                    </TouchableOpacity>
+                                </>
+                            )}
+
+                            {step === 'input' && inputMode === 'email' && (
+                                <>
+                                    {/* Email Input */}
+                                    <View style={styles.inputContainer}>
+                                        <Ionicons name="mail-outline" size={20} color={COLORS.gray} />
+                                        <TextInput
+                                            style={styles.textInput}
+                                            placeholder="Email manzilingiz"
+                                            placeholderTextColor={COLORS.gray}
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
+                                            value={email}
+                                            onChangeText={(text) => {
+                                                setEmail(text);
+                                                setError('');
+                                            }}
+                                        />
+                                    </View>
+
+                                    {/* Toggle to phone */}
+                                    <TouchableOpacity onPress={toggleInputMode} style={styles.toggleLink}>
+                                        <Text style={styles.toggleText}>
+                                            Telefon raqam orqali kirish
+                                        </Text>
+                                    </TouchableOpacity>
+                                </>
+                            )}
+
+                            {step === 'password' && (
+                                <>
+                                    {/* Show email */}
+                                    <View style={[styles.inputContainer, styles.inputDisabled]}>
+                                        <Ionicons name="mail" size={20} color={COLORS.primary} />
+                                        <Text style={styles.emailDisplay}>{email}</Text>
+                                        <TouchableOpacity onPress={() => setStep('input')}>
+                                            <Ionicons name="pencil" size={18} color={COLORS.primary} />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Password Input */}
+                                    <View style={styles.inputContainer}>
+                                        <Ionicons name="lock-closed-outline" size={20} color={COLORS.gray} />
+                                        <TextInput
+                                            style={styles.textInput}
+                                            placeholder="Parol (6+ belgi)"
+                                            placeholderTextColor={COLORS.gray}
+                                            secureTextEntry
+                                            value={password}
+                                            onChangeText={(text) => {
+                                                setPassword(text);
+                                                setError('');
+                                            }}
+                                        />
+                                    </View>
+                                </>
+                            )}
+
+                            {/* Error Message */}
+                            {error ? (
+                                <View style={styles.errorBox}>
+                                    <Ionicons name="alert-circle" size={16} color={COLORS.red} />
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
+                            ) : null}
+
+                            {/* Continue Button */}
+                            <TouchableOpacity
+                                style={[styles.continueBtn, isLoading && styles.continueBtnDisabled]}
+                                onPress={
+                                    step === 'password'
+                                        ? handlePasswordSubmit
+                                        : inputMode === 'phone'
+                                            ? handlePhoneContinue
+                                            : handleEmailContinue
+                                }
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <ActivityIndicator color={COLORS.white} />
+                                ) : (
+                                    <Text style={styles.continueBtnText}>Davom etish</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Terms Text */}
+                        <Text style={styles.termsText}>
+                            Davom etish orqali siz{' '}
+                            <Text style={styles.termsLink}>Foydalanish shartlari</Text> va{' '}
+                            <Text style={styles.termsLink}>Maxfiylik siyosati</Text>ga rozilik bildirasiz
+                        </Text>
+                    </Animated.View>
+
+                    {/* Bottom Section - Social Login */}
+                    {!keyboardVisible && (
+                        <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 16 }]}>
+                            <View style={styles.divider}>
+                                <View style={styles.dividerLine} />
+                                <Text style={styles.dividerText}>yoki</Text>
+                                <View style={styles.dividerLine} />
+                            </View>
+
+                            <View style={styles.socialButtons}>
+                                <TouchableOpacity style={styles.socialBtn} onPress={handleGoogleSignIn}>
+                                    <Image
+                                        source={{ uri: 'https://www.google.com/favicon.ico' }}
+                                        style={styles.socialIcon}
+                                    />
+                                    <Text style={styles.socialBtnText}>Google</Text>
+                                </TouchableOpacity>
+
+                                {Platform.OS === 'ios' && (
+                                    <TouchableOpacity style={[styles.socialBtn, styles.appleBtn]} onPress={handleAppleSignIn}>
+                                        <Ionicons name="logo-apple" size={20} color={COLORS.white} />
+                                        <Text style={[styles.socialBtnText, styles.appleBtnText]}>Apple</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
+
+                            <TouchableOpacity style={styles.guestBtn} onPress={() => router.back()}>
+                                <Text style={styles.guestBtnText}>Mehmon sifatida davom etish</Text>
+                            </TouchableOpacity>
                         </View>
-
-                        {/* Name Input - Only for signup */}
-                        {mode === 'signup' && (
-                            <View style={styles.inputSection}>
-                                <Text style={styles.inputLabel}>Full Name</Text>
-                                <View style={styles.inputContainer}>
-                                    <Ionicons name="person-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder="Enter your name"
-                                        placeholderTextColor={COLORS.gray}
-                                        value={displayName}
-                                        onChangeText={(text) => {
-                                            setDisplayName(text);
-                                            setError('');
-                                        }}
-                                    />
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Password Input - For signin/signup */}
-                        {mode !== 'input' && (
-                            <View style={styles.inputSection}>
-                                <Text style={styles.inputLabel}>Password</Text>
-                                <View style={styles.inputContainer}>
-                                    <Ionicons name="lock-closed-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder={mode === 'signup' ? 'Create password (6+ chars)' : 'Enter password'}
-                                        placeholderTextColor={COLORS.gray}
-                                        secureTextEntry
-                                        value={password}
-                                        onChangeText={(text) => {
-                                            setPassword(text);
-                                            setError('');
-                                        }}
-                                    />
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Error Message */}
-                        {error ? (
-                            <View style={styles.errorContainer}>
-                                <Ionicons name="alert-circle" size={16} color={COLORS.red} />
-                                <Text style={styles.errorText}>{error}</Text>
-                            </View>
-                        ) : null}
-
-                        {/* Continue/Submit Button */}
-                        <TouchableOpacity
-                            style={[styles.primaryBtn, isLoading && styles.primaryBtnDisabled]}
-                            onPress={mode === 'input' ? handleContinue : mode === 'signin' ? handleSignIn : handleSignUp}
-                            disabled={isLoading}
-                        >
-                            {isLoading ? (
-                                <ActivityIndicator color={COLORS.white} />
-                            ) : (
-                                <Text style={styles.primaryBtnText}>
-                                    {mode === 'input' ? 'Continue' : mode === 'signin' ? 'Sign In' : 'Create Account'}
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Toggle signin/signup */}
-                        {mode !== 'input' && (
-                            <TouchableOpacity style={styles.toggleBtn} onPress={toggleMode}>
-                                <Text style={styles.toggleText}>
-                                    {mode === 'signin'
-                                        ? "Don't have an account? "
-                                        : "Already have an account? "}
-                                    <Text style={styles.toggleLink}>
-                                        {mode === 'signin' ? 'Sign Up' : 'Sign In'}
-                                    </Text>
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    </Animated.View>
-
-                    {/* Divider */}
-                    <View style={styles.divider}>
-                        <View style={styles.dividerLine} />
-                        <Text style={styles.dividerText}>or continue with</Text>
-                        <View style={styles.dividerLine} />
-                    </View>
-
-                    {/* Social Login Buttons */}
-                    <View style={styles.socialButtons}>
-                        <TouchableOpacity style={styles.socialBtn} onPress={handleGoogleSignIn}>
-                            <Image
-                                source={{ uri: 'https://www.google.com/favicon.ico' }}
-                                style={styles.socialIcon}
-                            />
-                            <Text style={styles.socialBtnText}>Google</Text>
-                        </TouchableOpacity>
-
-                        {Platform.OS === 'ios' && (
-                            <TouchableOpacity style={[styles.socialBtn, styles.appleBtn]} onPress={handleAppleSignIn}>
-                                <Ionicons name="logo-apple" size={22} color={COLORS.white} />
-                                <Text style={[styles.socialBtnText, styles.appleBtnText]}>Apple</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-
-                    {/* Guest Button */}
-                    <TouchableOpacity style={styles.guestBtn} onPress={() => router.back()}>
-                        <Text style={styles.guestBtnText}>Continue as Guest</Text>
-                    </TouchableOpacity>
-
-                    {/* Terms */}
-                    <Text style={styles.termsText}>
-                        By continuing, you agree to our{' '}
-                        <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-                        <Text style={styles.termsLink}>Privacy Policy</Text>
-                    </Text>
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    )}
+                </KeyboardAvoidingView>
+            </View>
         </TouchableWithoutFeedback>
     );
 }
@@ -359,157 +407,170 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.background,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 15,
-        paddingVertical: 10,
+    closeBtn: {
+        position: 'absolute',
+        left: 16,
+        zIndex: 100,
+        padding: 4,
     },
-    backBtn: {
-        padding: 5,
+    keyboardView: {
+        flex: 1,
     },
     content: {
         flex: 1,
-        paddingHorizontal: 25,
+        paddingHorizontal: 24,
+        paddingTop: 60,
     },
     logoArea: {
         alignItems: 'center',
-        marginTop: 20,
-        marginBottom: 30,
-    },
-    logoContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 30,
-        backgroundColor: COLORS.white,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 5,
+        marginBottom: 24,
     },
     logo: {
-        width: 70,
-        height: 70,
+        width: 100,
+        height: 100,
     },
     title: {
-        fontSize: 28,
-        fontWeight: 'bold',
+        fontSize: 26,
+        fontWeight: '700',
         color: COLORS.dark,
-        marginBottom: 10,
+        textAlign: 'center',
+        marginBottom: 8,
     },
     subtitle: {
         fontSize: 15,
         color: COLORS.gray,
         textAlign: 'center',
-        lineHeight: 22,
-        paddingHorizontal: 10,
+        marginBottom: 32,
     },
     formArea: {
-        marginBottom: 20,
+        gap: 12,
     },
-    inputSection: {
-        marginBottom: 16,
+    phoneRow: {
+        flexDirection: 'row',
+        gap: 10,
     },
-    inputLabel: {
-        fontSize: 14,
-        fontWeight: '600',
+    countryCode: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.lightGray,
+        paddingHorizontal: 14,
+        paddingVertical: 16,
+        borderRadius: 12,
+        gap: 8,
+    },
+    countryFlag: {
+        fontSize: 18,
+    },
+    countryCodeText: {
+        fontSize: 16,
+        fontWeight: '500',
         color: COLORS.dark,
-        marginBottom: 8,
+    },
+    phoneInput: {
+        flex: 1,
+        backgroundColor: COLORS.lightGray,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        borderRadius: 12,
+        fontSize: 18,
+        fontWeight: '500',
+        color: COLORS.dark,
+        letterSpacing: 1,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.white,
-        borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: COLORS.lightGray,
-        paddingHorizontal: 14,
-        height: 54,
+        backgroundColor: COLORS.lightGray,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        borderRadius: 12,
+        gap: 12,
     },
     inputDisabled: {
-        backgroundColor: '#F9F9F9',
+        backgroundColor: '#F9F5F1',
     },
-    inputIcon: {
-        marginRight: 10,
-    },
-    input: {
+    textInput: {
         flex: 1,
         fontSize: 16,
         color: COLORS.dark,
     },
-    editBtn: {
-        padding: 6,
+    emailDisplay: {
+        flex: 1,
+        fontSize: 16,
+        color: COLORS.dark,
+        fontWeight: '500',
     },
-    errorContainer: {
+    toggleLink: {
+        alignSelf: 'center',
+        paddingVertical: 8,
+    },
+    toggleText: {
+        fontSize: 14,
+        color: COLORS.primary,
+        fontWeight: '500',
+    },
+    errorBox: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFEBEE',
         paddingVertical: 10,
-        paddingHorizontal: 12,
+        paddingHorizontal: 14,
         borderRadius: 10,
-        marginBottom: 16,
+        gap: 8,
     },
     errorText: {
         color: COLORS.red,
-        fontSize: 14,
-        marginLeft: 8,
+        fontSize: 13,
         flex: 1,
     },
-    primaryBtn: {
+    continueBtn: {
         backgroundColor: COLORS.primary,
         paddingVertical: 16,
-        borderRadius: 14,
+        borderRadius: 12,
         alignItems: 'center',
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        marginTop: 8,
     },
-    primaryBtnDisabled: {
+    continueBtnDisabled: {
         opacity: 0.7,
     },
-    primaryBtnText: {
+    continueBtnText: {
         color: COLORS.white,
         fontSize: 17,
-        fontWeight: 'bold',
-    },
-    toggleBtn: {
-        marginTop: 16,
-        alignItems: 'center',
-    },
-    toggleText: {
-        fontSize: 14,
-        color: COLORS.gray,
-    },
-    toggleLink: {
-        color: COLORS.primary,
         fontWeight: '600',
+    },
+    termsText: {
+        fontSize: 12,
+        color: COLORS.gray,
+        textAlign: 'center',
+        marginTop: 20,
+        lineHeight: 18,
+        paddingHorizontal: 20,
+    },
+    termsLink: {
+        color: COLORS.primary,
+    },
+    bottomSection: {
+        paddingHorizontal: 24,
     },
     divider: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 24,
+        marginBottom: 20,
     },
     dividerLine: {
         flex: 1,
         height: 1,
-        backgroundColor: COLORS.lightGray,
+        backgroundColor: COLORS.border,
     },
     dividerText: {
-        paddingHorizontal: 15,
+        paddingHorizontal: 16,
         color: COLORS.gray,
         fontSize: 13,
     },
     socialButtons: {
         flexDirection: 'row',
-        justifyContent: 'center',
         gap: 12,
-        marginBottom: 20,
+        marginBottom: 12,
     },
     socialBtn: {
         flex: 1,
@@ -517,9 +578,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 14,
-        borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: COLORS.lightGray,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
         backgroundColor: COLORS.white,
         gap: 8,
     },
@@ -529,7 +590,7 @@ const styles = StyleSheet.create({
     },
     socialBtnText: {
         fontSize: 15,
-        fontWeight: '600',
+        fontWeight: '500',
         color: COLORS.dark,
     },
     appleBtn: {
@@ -541,27 +602,14 @@ const styles = StyleSheet.create({
     },
     guestBtn: {
         paddingVertical: 14,
-        borderRadius: 14,
+        borderRadius: 12,
         alignItems: 'center',
-        borderWidth: 1.5,
+        borderWidth: 1,
         borderColor: COLORS.primary,
-        marginBottom: 20,
     },
     guestBtnText: {
         color: COLORS.primary,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    termsText: {
-        fontSize: 12,
-        color: COLORS.gray,
-        textAlign: 'center',
-        marginBottom: 30,
-        lineHeight: 18,
-        paddingHorizontal: 10,
-    },
-    termsLink: {
-        color: COLORS.primary,
+        fontSize: 15,
         fontWeight: '500',
     },
 });
